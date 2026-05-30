@@ -12,13 +12,19 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from mirage.resource.telegram.config import TelegramConfig
+from collections.abc import AsyncIterator
 
-__all__ = ["TelegramConfig", "TelegramResource"]
+from mirage.accessor.notion import NotionAccessor
+from mirage.cache.index import IndexCacheStore
+from mirage.core.notion.read import read as notion_read
+from mirage.types import PathSpec
 
 
-def __getattr__(name: str):
-    if name == "TelegramResource":
-        from mirage.resource.telegram.telegram import TelegramResource
-        return TelegramResource
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+async def read_stream(
+    accessor: NotionAccessor,
+    path: PathSpec,
+    index: IndexCacheStore = None,
+) -> AsyncIterator[bytes]:
+    data = await notion_read(accessor, path, index)
+    if data:
+        yield data
