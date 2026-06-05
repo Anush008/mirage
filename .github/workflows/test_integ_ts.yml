@@ -109,6 +109,12 @@ jobs:
           pnpm exec tsx redis.ts > /tmp/ts-redis.out
           diff truth.txt /tmp/ts-redis.out
 
+      - name: Run Safeguard scenarios and diff against truth
+        working-directory: integ
+        run: |
+          pnpm exec tsx safeguard.ts > /tmp/ts-safeguard.out
+          diff truth_safeguard.txt /tmp/ts-safeguard.out
+
       # S3 is not yet on the shared generic layer, so its output still diverges
       # from truth.txt (find newline, dir trailing-slash, grep -r on dirs).
       # Smoke-run it against MinIO for now; re-enable the truth diff once the

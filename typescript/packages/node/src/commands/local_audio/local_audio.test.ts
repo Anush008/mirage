@@ -280,15 +280,17 @@ describe('audio stat after cache promotion (cacheMount registration)', () => {
     await ws.close()
   })
 
-  it('regression guard: without cacheMount registration, second stat falls through to built-in', async () => {
+  it('local mount: second stat keeps audio metadata without cacheMount registration', async () => {
     const backend = new DiskResource({ root: DATA_DIR })
     const ws = new Workspace({ '/': backend }, { mode: MountMode.READ })
     ws.mount('/')?.registerFns(DISK_LOCAL_AUDIO_COMMANDS)
-    // Intentionally NOT calling ws.cacheMount.registerFns(...)
-
+    // Intentionally NOT calling ws.cacheMount.registerFns(...). A local
+    // (non-remote) mount never routes repeated reads through the cache
+    // mount, so the custom stat survives even without registration. The
+    // cache-mount fall-through only applies to remote-backed mounts.
     await ws.execute('stat /example.wav')
     const second = await ws.execute('stat /example.wav')
-    expect(DEC.decode(second.stdout)).not.toContain('Sample rate:')
+    expect(DEC.decode(second.stdout)).toContain('Sample rate:')
     await ws.close()
   })
 })

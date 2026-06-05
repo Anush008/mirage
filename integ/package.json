@@ -8,7 +8,8 @@
     "disk": "tsx disk.ts",
     "redis": "tsx redis.ts",
     "opfs": "tsx opfs.ts",
-    "s3": "tsx s3.ts"
+    "s3": "tsx s3.ts",
+    "safeguard": "tsx safeguard.ts"
   },
   "dependencies": {
     "@struktoai/mirage-browser": "workspace:*",

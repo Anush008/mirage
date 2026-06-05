@@ -24,7 +24,8 @@ import type { DispatchFn } from '../executor/cross_mount.ts'
 import { MountRegistry } from '../mount/registry.ts'
 import { Session } from '../session/session.ts'
 import { CommandSpec, Operand, OperandKind, Option } from '../../commands/spec/types.ts'
-import { classifyArgvBySpec, executeNode, type ExecuteNodeDeps } from './execute_node.ts'
+import { executeNode, type ExecuteNodeDeps } from './execute_node.ts'
+import { classifyArgvBySpec } from './classify_argv.ts'
 
 function decode(b: Uint8Array | null): string {
   return b === null ? '' : new TextDecoder().decode(b)

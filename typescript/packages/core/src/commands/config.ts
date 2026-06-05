@@ -16,7 +16,7 @@ import type { Accessor } from '../accessor/base.ts'
 import type { IndexCacheStore } from '../cache/index/index.ts'
 import { IOResult, type ByteSource } from '../io/types.ts'
 import type { Resource } from '../resource/base.ts'
-import type { PathSpec } from '../types.ts'
+import type { CommandSafeguard, PathSpec } from '../types.ts'
 import type { PyodideRuntime } from '../workspace/executor/python/runtime.ts'
 import type { AggregateResult } from './builtin/aggregators.ts'
 import { renderHelp } from './spec/help.ts'
@@ -97,6 +97,7 @@ export interface RegisteredCommandInit {
   src?: string | null
   dst?: string | null
   write?: boolean
+  safeguard?: CommandSafeguard | null
 }
 
 export class RegisteredCommand {
@@ -110,6 +111,7 @@ export class RegisteredCommand {
   readonly src: string | null
   readonly dst: string | null
   readonly write: boolean
+  readonly safeguard: CommandSafeguard | null
 
   constructor(init: RegisteredCommandInit) {
     this.name = init.name
@@ -122,6 +124,7 @@ export class RegisteredCommand {
     this.src = init.src ?? null
     this.dst = init.dst ?? null
     this.write = init.write ?? false
+    this.safeguard = init.safeguard ?? null
   }
 }
 
@@ -134,6 +137,7 @@ export interface CommandOptions<A extends Accessor = Accessor> {
   provision?: ProvisionFn<A> | null
   aggregate?: AggregateFn | null
   write?: boolean
+  safeguard?: CommandSafeguard | null
 }
 
 const HELP_OPTION = new Option({
@@ -184,6 +188,7 @@ export function command<A extends Accessor = Accessor>(
         provisionFn: (options.provision ?? null) as ProvisionFn | null,
         aggregate: options.aggregate ?? null,
         write: options.write ?? false,
+        safeguard: options.safeguard ?? null,
       }),
   )
 }

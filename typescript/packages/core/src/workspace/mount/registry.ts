@@ -305,7 +305,12 @@ export class MountRegistry {
     }
     if (mount === null) return null
     const defaultMount = this.defaultMountRef
-    if (defaultMount !== null && pathScopes.length > 0 && isFileCache(defaultMount.resource)) {
+    if (
+      defaultMount !== null &&
+      pathScopes.length > 0 &&
+      isFileCache(defaultMount.resource) &&
+      mount.resource.isRemote === true
+    ) {
       const baseCmd = mount.resolveCommand(cmdName)
       if (!baseCmd?.write) {
         if (this.consistency === ConsistencyPolicy.ALWAYS) {

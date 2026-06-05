@@ -14,6 +14,7 @@
 
 import type { ByteSource } from '../../io/types.ts'
 import { IOResult, materialize } from '../../io/types.ts'
+import { CommandTimeoutError } from '../../commands/builtin/utils/safeguard.ts'
 import type { CallStack } from '../../shell/call_stack.ts'
 import type { JobTable } from '../../shell/job_table.ts'
 import type { Session } from '../session/session.ts'
@@ -42,8 +43,24 @@ export async function handleBackground(
   const bgSession = session.fork()
 
   const abort = new AbortController()
+  const cmdStrInner = left.text
   const task: Promise<[ByteSource | null, IOResult, ExecutionNode]> = (async () => {
-    const [stdout, io, execNode] = await executeNode(left, bgSession, null, callStack)
+    let stdout: ByteSource | null
+    let io: IOResult
+    let execNode: ExecutionNode
+    try {
+      ;[stdout, io, execNode] = await executeNode(left, bgSession, null, callStack)
+    } catch (err) {
+      if (err instanceof CommandTimeoutError) {
+        const msg = new TextEncoder().encode(`${err.message}\n`)
+        return [
+          new Uint8Array(),
+          new IOResult({ exitCode: 124, stderr: msg }),
+          new ExecutionNode({ command: cmdStrInner, stderr: msg, exitCode: 124 }),
+        ]
+      }
+      throw err
+    }
     const materialized = await materialize(stdout)
     io.syncExitCode()
     return [materialized, io, execNode]

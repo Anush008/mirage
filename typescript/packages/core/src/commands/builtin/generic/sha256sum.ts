@@ -39,16 +39,20 @@ async function* sha256SingleStream(
 async function* sha256Multi(stream: Stream, paths: readonly PathSpec[]): AsyncIterable<Uint8Array> {
   for (const p of paths) {
     const digest = await hashStream(stream(p))
-    yield ENC.encode(`${digest}  ${p.stripPrefix}\n`)
+    yield ENC.encode(`${digest}  ${p.original}\n`)
   }
 }
 
-function makePathSpec(original: string): PathSpec {
+function makePathSpec(original: string, mountPrefix: string): PathSpec {
+  if (mountPrefix !== '' && original.startsWith(mountPrefix + '/')) {
+    return new PathSpec({ original, directory: original, resolved: true, prefix: mountPrefix })
+  }
   return new PathSpec({ original, directory: original, resolved: true })
 }
 
 async function sha256Check(stream: Stream, p: PathSpec): Promise<[Uint8Array, number]> {
   const data = DEC.decode(await materialize(stream(p)))
+  const mountPrefix = p.prefix
   const lines: string[] = []
   let failed = false
   for (const line of data.split('\n')) {
@@ -57,7 +61,7 @@ async function sha256Check(stream: Stream, p: PathSpec): Promise<[Uint8Array, nu
     if (idx < 0) continue
     const expected = line.slice(0, idx)
     const filename = line.slice(idx + 2)
-    const digest = await hashStream(stream(makePathSpec(filename)))
+    const digest = await hashStream(stream(makePathSpec(filename, mountPrefix)))
     if (digest === expected) lines.push(`${filename}: OK`)
     else {
       lines.push(`${filename}: FAILED`)
