@@ -1,7 +1,7 @@
 === ls /data/ ===
 hello world
 revenue,100\nexpense,80
-name=hello.txt size=12 modified=None type=text
+name=hello.txt size=12
 "alice"
 └── user.json
 /data/hello.txt
