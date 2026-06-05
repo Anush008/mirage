@@ -12,9 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from datetime import datetime, timezone
-
 from mirage.accessor.redis import RedisAccessor
+from mirage.core.timeutil import now_iso
 from mirage.types import PathSpec
 
 
@@ -27,7 +26,7 @@ async def mkdir_p(accessor: RedisAccessor, path: PathSpec) -> None:
     p = _norm(path)
     parts = p.strip("/").split("/")
     current = ""
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_iso()
     for part in parts:
         current += "/" + part
         await store.add_dir(current)

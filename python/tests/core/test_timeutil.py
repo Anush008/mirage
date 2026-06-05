@@ -12,21 +12,23 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from mirage.accessor.ram import RAMAccessor
-from mirage.core.timeutil import now_iso
-from mirage.types import PathSpec
+from datetime import datetime, timedelta, timezone
+
+from mirage.core.timeutil import now_iso, to_iso_z
 
 
-def _norm(path: str) -> str:
-    return "/" + path.strip("/")
+def test_to_iso_z_converts_utc_offset_to_z():
+    dt = datetime(2026, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+    assert to_iso_z(dt) == "2026-01-02T03:04:05Z"
 
 
-async def truncate(accessor: RAMAccessor, path: PathSpec, length: int) -> None:
-    store = accessor.store
-    p = _norm(path)
-    if p in store.files:
-        data = store.files[p]
-    else:
-        data = b""
-    store.files[p] = data[:length].ljust(length, b"\0")
-    store.modified[p] = now_iso()
+def test_to_iso_z_normalizes_non_utc_to_z():
+    tz = timezone(timedelta(hours=5))
+    dt = datetime(2026, 1, 2, 8, 4, 5, tzinfo=tz)
+    assert to_iso_z(dt) == "2026-01-02T03:04:05Z"
+
+
+def test_now_iso_uses_z_suffix():
+    s = now_iso()
+    assert s.endswith("Z")
+    assert "+00:00" not in s

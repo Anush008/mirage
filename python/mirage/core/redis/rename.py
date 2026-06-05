@@ -12,9 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from datetime import datetime, timezone
-
 from mirage.accessor.redis import RedisAccessor
+from mirage.core.timeutil import now_iso
 from mirage.types import PathSpec
 
 
@@ -37,7 +36,7 @@ async def rename(
         dst = dst.strip_prefix
     store = accessor.store
     s, d = _norm(src), _norm(dst)
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_iso()
     if await store.has_file(s):
         data = await store.get_file(s)
         mod = await store.get_modified(s)

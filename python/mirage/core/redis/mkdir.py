@@ -12,9 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from datetime import datetime, timezone
-
 from mirage.accessor.redis import RedisAccessor
+from mirage.core.timeutil import now_iso
 from mirage.types import PathSpec
 
 
@@ -41,7 +40,7 @@ async def mkdir(
     if parents:
         parts = p.strip("/").split("/")
         current = ""
-        now = datetime.now(timezone.utc).isoformat()
+        now = now_iso()
         for part in parts:
             current += "/" + part
             await store.add_dir(current)
@@ -53,4 +52,4 @@ async def mkdir(
     if parent != "/" and not await store.has_dir(parent):
         raise FileNotFoundError(f"parent directory does not exist: {parent}")
     await store.add_dir(p)
-    await store.set_modified(p, datetime.now(timezone.utc).isoformat())
+    await store.set_modified(p, now_iso())

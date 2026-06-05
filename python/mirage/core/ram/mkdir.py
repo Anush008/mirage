@@ -12,9 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from datetime import datetime, timezone
-
 from mirage.accessor.ram import RAMAccessor
+from mirage.core.timeutil import now_iso
 from mirage.types import PathSpec
 
 
@@ -39,7 +38,7 @@ async def mkdir(accessor: RAMAccessor,
     if parents:
         parts = p.strip("/").split("/")
         current = ""
-        now = datetime.now(timezone.utc).isoformat()
+        now = now_iso()
         for part in parts:
             current += "/" + part
             store.dirs.add(current)
@@ -50,4 +49,4 @@ async def mkdir(accessor: RAMAccessor,
     if parent != "/" and parent not in store.dirs:
         raise FileNotFoundError(f"parent directory does not exist: {parent}")
     store.dirs.add(p)
-    store.modified[p] = datetime.now(timezone.utc).isoformat()
+    store.modified[p] = now_iso()

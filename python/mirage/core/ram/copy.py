@@ -12,9 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from datetime import datetime, timezone
-
 from mirage.accessor.ram import RAMAccessor
+from mirage.core.timeutil import now_iso
 from mirage.types import PathSpec
 
 
@@ -36,4 +35,4 @@ async def copy(accessor: RAMAccessor, src: PathSpec, dst: PathSpec) -> None:
     if s not in store.files:
         raise FileNotFoundError(s)
     store.files[d] = store.files[s]
-    store.modified[d] = datetime.now(timezone.utc).isoformat()
+    store.modified[d] = now_iso()

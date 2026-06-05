@@ -23,6 +23,7 @@ except ImportError as _err:
 from mirage.cache.index.config import (IndexConfig, IndexEntry, ListResult,
                                        LookupResult, LookupStatus)
 from mirage.cache.index.store import IndexCacheStore
+from mirage.core.timeutil import to_iso_z
 
 ENTRY_PREFIX = "mirage:idx:entry:"
 CHILDREN_PREFIX = "mirage:idx:children:"
@@ -86,7 +87,7 @@ class RedisIndexCacheStore(IndexCacheStore):
     async def put(self, resource_path: str, entry: IndexEntry) -> None:
         if not entry.index_time:
             entry = entry.model_copy(
-                update={"index_time": datetime.now(timezone.utc).isoformat()})
+                update={"index_time": to_iso_z(datetime.now(timezone.utc))})
         await self._client.set(self._entry_key(resource_path),
                                entry.model_dump_json())
 
@@ -108,7 +109,7 @@ class RedisIndexCacheStore(IndexCacheStore):
         expired_at: datetime | None = None,
     ) -> None:
         now = datetime.now(timezone.utc)
-        now_iso = now.isoformat()
+        now_iso = to_iso_z(now)
         prefix = "/" if resource_path == "/" else resource_path + "/"
 
         pipe = self._client.pipeline()

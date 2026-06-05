@@ -12,9 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from datetime import datetime, timezone
-
 from mirage.accessor.ram import RAMAccessor
+from mirage.core.timeutil import now_iso
 from mirage.types import PathSpec
 
 
@@ -33,7 +32,7 @@ async def rename(accessor: RAMAccessor, src: PathSpec, dst: PathSpec) -> None:
         dst = dst.strip_prefix
     store = accessor.store
     s, d = _norm(src), _norm(dst)
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_iso()
     if s in store.files:
         store.files[d] = store.files.pop(s)
         store.modified[d] = store.modified.pop(s, now)

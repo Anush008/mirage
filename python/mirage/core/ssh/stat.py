@@ -19,6 +19,7 @@ import asyncssh
 from mirage.accessor.ssh import SSHAccessor
 from mirage.cache.index import IndexCacheStore
 from mirage.core.ssh._client import _abs
+from mirage.core.timeutil import to_iso_z
 from mirage.types import FileStat, FileType, PathSpec
 from mirage.utils.filetype import guess_type
 
@@ -44,8 +45,8 @@ async def stat(accessor: SSHAccessor,
         name = path.rstrip("/").rsplit("/", 1)[-1] or "/"
         mod_str = ""
         if attrs.mtime is not None:
-            mod_str = datetime.fromtimestamp(attrs.mtime,
-                                             tz=timezone.utc).isoformat()
+            mod_str = to_iso_z(
+                datetime.fromtimestamp(attrs.mtime, tz=timezone.utc))
         return FileStat(
             name=name,
             size=attrs.size or 0,

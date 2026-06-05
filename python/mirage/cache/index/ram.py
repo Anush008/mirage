@@ -18,6 +18,7 @@ from mirage.cache.index.config import (IndexConfig, IndexEntry, ListResult,
                                        LookupResult, LookupStatus)
 from mirage.cache.index.store import IndexCacheStore
 from mirage.cache.lock import KeyLockMixin
+from mirage.core.timeutil import to_iso_z
 
 
 class RAMIndexCacheStore(IndexCacheStore, KeyLockMixin):
@@ -45,7 +46,7 @@ class RAMIndexCacheStore(IndexCacheStore, KeyLockMixin):
             if not entry.index_time:
                 entry = entry.model_copy(
                     update={
-                        "index_time": datetime.now(timezone.utc).isoformat()
+                        "index_time": to_iso_z(datetime.now(timezone.utc))
                     })
             self._entries[resource_path] = entry
 
@@ -67,7 +68,7 @@ class RAMIndexCacheStore(IndexCacheStore, KeyLockMixin):
         async with self._lock_for(resource_path):
             now = datetime.now(timezone.utc)
             exp = expired_at or (now + timedelta(seconds=self._ttl))
-            now_iso = now.isoformat()
+            now_iso = to_iso_z(now)
             prefix = "/" if resource_path == "/" else resource_path + "/"
             child_keys: list[str] = []
             for name, entry in entries:

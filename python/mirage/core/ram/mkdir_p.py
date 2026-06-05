@@ -12,9 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from datetime import datetime, timezone
-
 from mirage.accessor.ram import RAMAccessor
+from mirage.core.timeutil import now_iso
 from mirage.types import PathSpec
 
 
@@ -27,7 +26,7 @@ async def mkdir_p(accessor: RAMAccessor, path: PathSpec) -> None:
     p = _norm(path)
     parts = p.strip("/").split("/")
     current = ""
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_iso()
     for part in parts:
         current += "/" + part
         store.dirs.add(current)

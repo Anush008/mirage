@@ -12,11 +12,10 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from datetime import timezone
-
 from mirage.accessor.s3 import S3Accessor
 from mirage.cache.index import IndexCacheStore
 from mirage.core.s3._client import _client_kwargs, _key, async_session
+from mirage.core.timeutil import to_iso_z
 from mirage.types import FileStat, FileType, PathSpec
 from mirage.utils.filetype import guess_type
 
@@ -81,8 +80,7 @@ async def stat(accessor: S3Accessor,
         # Try head_object first — works for files.
         try:
             resp = await client.head_object(Bucket=config.bucket, Key=key)
-            modified = resp["LastModified"].astimezone(
-                timezone.utc).isoformat()
+            modified = to_iso_z(resp["LastModified"])
             etag_raw = resp.get("ETag", "").strip('"')
             vid_raw = resp.get("VersionId")
             if vid_raw == "null":

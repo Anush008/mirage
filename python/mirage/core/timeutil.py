@@ -12,21 +12,12 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from mirage.accessor.ram import RAMAccessor
-from mirage.core.timeutil import now_iso
-from mirage.types import PathSpec
+from datetime import datetime, timezone
 
 
-def _norm(path: str) -> str:
-    return "/" + path.strip("/")
+def to_iso_z(dt: datetime) -> str:
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-async def truncate(accessor: RAMAccessor, path: PathSpec, length: int) -> None:
-    store = accessor.store
-    p = _norm(path)
-    if p in store.files:
-        data = store.files[p]
-    else:
-        data = b""
-    store.files[p] = data[:length].ljust(length, b"\0")
-    store.modified[p] = now_iso()
+def now_iso() -> str:
+    return to_iso_z(datetime.now(timezone.utc))

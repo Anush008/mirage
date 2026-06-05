@@ -13,9 +13,9 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import time
-from datetime import datetime, timezone
 
 from mirage.accessor.ram import RAMAccessor
+from mirage.core.timeutil import now_iso
 from mirage.observe.context import record
 from mirage.types import PathSpec
 
@@ -42,5 +42,5 @@ async def write_bytes(accessor: RAMAccessor, path: PathSpec,
     if parent != "/" and parent not in store.dirs:
         raise FileNotFoundError(f"parent directory does not exist: {parent}")
     store.files[p] = data
-    store.modified[p] = datetime.now(timezone.utc).isoformat()
+    store.modified[p] = now_iso()
     record("write", path, "ram", len(data), start_ms)

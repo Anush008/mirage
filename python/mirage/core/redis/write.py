@@ -13,9 +13,9 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import time
-from datetime import datetime, timezone
 
 from mirage.accessor.redis import RedisAccessor
+from mirage.core.timeutil import now_iso
 from mirage.observe.context import record
 from mirage.types import PathSpec
 
@@ -45,5 +45,5 @@ async def write_bytes(
     if parent != "/" and not await store.has_dir(parent):
         raise FileNotFoundError(f"parent directory does not exist: {parent}")
     await store.set_file(p, data)
-    await store.set_modified(p, datetime.now(timezone.utc).isoformat())
+    await store.set_modified(p, now_iso())
     record("write", path, "redis", len(data), start_ms)

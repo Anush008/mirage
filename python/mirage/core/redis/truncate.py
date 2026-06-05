@@ -12,9 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from datetime import datetime, timezone
-
 from mirage.accessor.redis import RedisAccessor
+from mirage.core.timeutil import now_iso
 from mirage.types import PathSpec
 
 
@@ -30,4 +29,4 @@ async def truncate(accessor: RedisAccessor, path: PathSpec,
     if data is None:
         data = b""
     await store.set_file(p, data[:length].ljust(length, b"\0"))
-    await store.set_modified(p, datetime.now(timezone.utc).isoformat())
+    await store.set_modified(p, now_iso())

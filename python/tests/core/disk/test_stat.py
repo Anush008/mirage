@@ -32,6 +32,8 @@ async def test_stat_file(tmp_path):
     assert result.name == "hello.txt"
     assert result.size == 5
     assert result.modified is not None
+    assert result.modified.endswith("Z")
+    assert "+00:00" not in result.modified
     assert result.type != FileType.DIRECTORY
 
 

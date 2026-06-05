@@ -36,6 +36,8 @@ async def test_write_bytes(store):
                       b"hello")
     assert store.store.files["/hello.txt"] == b"hello"
     assert "/hello.txt" in store.store.modified
+    assert store.store.modified["/hello.txt"].endswith("Z")
+    assert "+00:00" not in store.store.modified["/hello.txt"]
 
 
 @pytest.mark.asyncio

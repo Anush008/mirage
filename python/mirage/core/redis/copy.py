@@ -12,9 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from datetime import datetime, timezone
-
 from mirage.accessor.redis import RedisAccessor
+from mirage.core.timeutil import now_iso
 from mirage.types import PathSpec
 
 
@@ -41,4 +40,4 @@ async def copy(
     if data is None:
         raise FileNotFoundError(s)
     await store.set_file(d, data)
-    await store.set_modified(d, datetime.now(timezone.utc).isoformat())
+    await store.set_modified(d, now_iso())

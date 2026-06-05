@@ -15,6 +15,7 @@
 from enum import Enum
 
 from mirage.cache.index.config import IndexEntry
+from mirage.core.timeutil import to_iso_z
 
 
 class S3ResourceType(str, Enum):
@@ -49,7 +50,7 @@ class S3IndexEntry(IndexEntry):
             resource_type=S3ResourceType.FILE,
             vfs_name=name,
             size=obj.get("Size"),
-            remote_time=modified.isoformat() if modified else "",
+            remote_time=to_iso_z(modified) if modified else "",
             etag=obj.get("ETag", ""),
         )
 
