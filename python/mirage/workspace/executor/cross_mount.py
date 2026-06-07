@@ -12,8 +12,10 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import dataclasses
 import re
 
+from mirage.core._shared.path_guard import backend_identity
 from mirage.io import IOResult
 from mirage.io.types import ByteSource
 from mirage.types import FileType, PathSpec
@@ -42,6 +44,7 @@ async def handle_cross_mount(
     text_args: list[str],
     flag_kwargs: dict,
     dispatch,
+    registry,
     cmd_str: str,
 ) -> tuple[ByteSource | None, IOResult, ExecutionNode]:
     """Execute a supported command whose path operands span mounts.
@@ -66,6 +69,9 @@ async def handle_cross_mount(
         text_args (list[str]): Original non-path command arguments.
         flag_kwargs (dict): Flags parsed from the shared command spec.
         dispatch (Callable): Workspace operation dispatcher.
+        registry (MountRegistry): Mount registry used to resolve each scope to
+            its backend identity so a move/copy onto the same underlying
+            object is rejected instead of destroying it.
         cmd_str (str): Original command text for the execution record.
 
     Returns:
@@ -74,9 +80,11 @@ async def handle_cross_mount(
     """
     try:
         if cmd_name == "cp":
-            return await _cross_cp(scopes, flag_kwargs, dispatch, cmd_str)
+            return await _cross_cp(scopes, flag_kwargs, dispatch, registry,
+                                   cmd_str)
         if cmd_name == "mv":
-            return await _cross_mv(scopes, flag_kwargs, dispatch, cmd_str)
+            return await _cross_mv(scopes, flag_kwargs, dispatch, registry,
+                                   cmd_str)
         if cmd_name == "diff":
             return await _cross_diff(scopes, dispatch, cmd_str)
         if cmd_name == "cmp":
@@ -100,6 +108,36 @@ async def handle_cross_mount(
 def _child_path(parent: PathSpec, source: PathSpec) -> PathSpec:
     name = source.original.rstrip("/").rsplit("/", 1)[-1]
     return PathSpec.from_str_path(parent.child(name), parent.prefix)
+
+
+def _scoped(mount, scope: PathSpec) -> PathSpec:
+    # Re-anchor the scope to its mount prefix so strip_prefix yields the
+    # in-mount path the backend addresses by.
+    return dataclasses.replace(scope, prefix=mount.prefix.rstrip("/"))
+
+
+def _same_backend_object(registry, a: PathSpec, b: PathSpec) -> bool:
+    # Two distinct mount prefixes can alias the same backing store (same disk
+    # dir, a shared ram/redis store, the same bucket mounted twice). Compare
+    # resolved backend identities so a move does not unlink the only copy.
+    try:
+        mount_a = registry.mount_for(a.original)
+        mount_b = registry.mount_for(b.original)
+    except ValueError:
+        return False
+    id_a = backend_identity(mount_a.resource.accessor, _scoped(mount_a, a))
+    id_b = backend_identity(mount_b.resource.accessor, _scoped(mount_b, b))
+    return id_a == id_b
+
+
+def _mutation_result(cmd_str, errors):
+    if errors:
+        err = ("\n".join(errors) + "\n").encode()
+        return None, IOResult(exit_code=1,
+                              stderr=err), ExecutionNode(command=cmd_str,
+                                                         exit_code=1,
+                                                         stderr=err)
+    return None, IOResult(), ExecutionNode(command=cmd_str, exit_code=0)
 
 
 async def _cross_targets(scopes, dispatch):
@@ -134,25 +172,37 @@ async def _cross_target_exists(target: PathSpec, dispatch) -> bool:
     return True
 
 
-async def _cross_cp(scopes, flag_kwargs, dispatch, cmd_str):
+async def _cross_cp(scopes, flag_kwargs, dispatch, registry, cmd_str):
     sources, targets = await _cross_targets(scopes, dispatch)
     source_data = await _read_cross_sources(sources, dispatch)
     no_clobber = flag_kwargs.get("n") is True
-    for target, data in zip(targets, source_data):
+    errors: list[str] = []
+    for src, target, data in zip(sources, targets, source_data):
+        if _same_backend_object(registry, src, target):
+            errors.append(f"cp: '{src.original}' and '{target.original}' "
+                          "are the same file")
+            continue
         # Check immediately before writing: earlier sources may share this
         # basename and create the target during the same command.
         if no_clobber and await _cross_target_exists(target, dispatch):
             continue
         await dispatch("write", target, data=data)
-    return None, IOResult(), ExecutionNode(command=cmd_str, exit_code=0)
+    return _mutation_result(cmd_str, errors)
 
 
-async def _cross_mv(scopes, flag_kwargs, dispatch, cmd_str):
+async def _cross_mv(scopes, flag_kwargs, dispatch, registry, cmd_str):
     sources, targets = await _cross_targets(scopes, dispatch)
     source_data = await _read_cross_sources(sources, dispatch)
     no_clobber = flag_kwargs.get("n") is True
+    errors: list[str] = []
     moved_sources = []
     for src, target, data in zip(sources, targets, source_data):
+        if _same_backend_object(registry, src, target):
+            # src and target alias the same object: writing then unlinking
+            # would overwrite it with its own bytes and then delete it.
+            errors.append(f"mv: '{src.original}' and '{target.original}' "
+                          "are the same file")
+            continue
         # A skipped no-clobber target must also preserve its source.
         if no_clobber and await _cross_target_exists(target, dispatch):
             continue
@@ -161,7 +211,7 @@ async def _cross_mv(scopes, flag_kwargs, dispatch, cmd_str):
     # Delete only sources whose destination write completed.
     for src in moved_sources:
         await dispatch("unlink", src)
-    return None, IOResult(), ExecutionNode(command=cmd_str, exit_code=0)
+    return _mutation_result(cmd_str, errors)
 
 
 async def _cross_diff(scopes, dispatch, cmd_str):

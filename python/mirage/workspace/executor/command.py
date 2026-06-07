@@ -269,7 +269,8 @@ async def handle_command(
             parsed = parse_command(command_spec, raw_argv, cwd=session.cwd)
             flag_kwargs = parse_to_kwargs(parsed)
         stdout, io, exec_node = await handle_cross_mount(
-            cmd_name, path_scopes, text_only, flag_kwargs, dispatch, cmd_str)
+            cmd_name, path_scopes, text_only, flag_kwargs, dispatch, registry,
+            cmd_str)
         if io.safeguard is None:
             mounts = []
             for s in path_scopes:

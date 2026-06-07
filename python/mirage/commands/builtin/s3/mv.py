@@ -16,6 +16,7 @@ from mirage.accessor.s3 import S3Accessor
 from mirage.cache.index import IndexCacheStore
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
+from mirage.core._shared.path_guard import same_backend_file
 from mirage.core.s3.glob import resolve_glob
 from mirage.core.s3.rename import rename
 from mirage.core.s3.stat import stat as stat_impl
@@ -27,7 +28,7 @@ async def _exists(accessor: S3Accessor, path: PathSpec | str) -> bool:
     try:
         await stat_impl(accessor, path)
         return True
-    except (FileNotFoundError, ValueError, Exception):
+    except FileNotFoundError:
         return False
 
 
@@ -46,6 +47,10 @@ async def mv(
     if len(paths) < 2:
         raise ValueError("mv: requires src and dst")
     paths = await resolve_glob(accessor, paths, index)
+    if same_backend_file(accessor, paths[0], paths[1]):
+        err = (f"mv: '{paths[0].original}' and '{paths[1].original}' "
+               "are the same file\n")
+        return None, IOResult(exit_code=1, stderr=err.encode())
     if n and await _exists(accessor, paths[1]):
         return None, IOResult()
     await rename(accessor, paths[0], paths[1])

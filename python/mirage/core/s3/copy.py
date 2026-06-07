@@ -13,11 +13,19 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 from mirage.accessor.s3 import S3Accessor
+from mirage.core._shared.path_guard import same_backend_file
 from mirage.core.s3._client import _client_kwargs, _key, async_session
+from mirage.core.s3.stat import stat
 from mirage.types import PathSpec
 
 
 async def copy(accessor: S3Accessor, src: PathSpec, dst: PathSpec) -> None:
+    await stat(accessor, src)
+    if same_backend_file(accessor, src, dst):
+        # Copying an object onto itself re-uploads it; on real AWS a self-copy
+        # without MetadataDirective=REPLACE is rejected outright. Skip it.
+        # Guard runs after stat so a missing source still raises.
+        return
     if isinstance(src, str):
         src = PathSpec(original=src, directory=src)
     if isinstance(src, PathSpec):

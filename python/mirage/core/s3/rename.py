@@ -13,11 +13,20 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 from mirage.accessor.s3 import S3Accessor
+from mirage.core._shared.path_guard import same_backend_file
 from mirage.core.s3._client import _client_kwargs, _key, async_session
+from mirage.core.s3.stat import stat
 from mirage.types import PathSpec
 
 
 async def rename(accessor: S3Accessor, src: PathSpec, dst: PathSpec) -> None:
+    await stat(accessor, src)
+    if same_backend_file(accessor, src, dst):
+        # rename(2) onto the same path is a no-op. copy_object + delete_object
+        # here would copy the object onto itself (allowed by lenient
+        # S3-compatible stores) and then delete it, destroying the only copy.
+        # Guard runs after stat so a missing source still raises.
+        return
     if isinstance(src, str):
         src = PathSpec(original=src, directory=src)
     if isinstance(src, PathSpec):

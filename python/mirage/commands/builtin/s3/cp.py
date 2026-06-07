@@ -16,6 +16,7 @@ from mirage.accessor.s3 import S3Accessor
 from mirage.cache.index import IndexCacheStore
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
+from mirage.core._shared.path_guard import same_backend_file
 from mirage.core.s3.copy import copy
 from mirage.core.s3.find import find as find_impl
 from mirage.core.s3.glob import resolve_glob
@@ -28,7 +29,7 @@ async def _exists(accessor: S3Accessor, path: PathSpec | str) -> bool:
     try:
         await stat_impl(accessor, path)
         return True
-    except (FileNotFoundError, ValueError, Exception):
+    except FileNotFoundError:
         return False
 
 
@@ -50,6 +51,10 @@ async def cp(
     if len(paths) < 2:
         raise ValueError("cp: requires src and dst")
     paths = await resolve_glob(accessor, paths, index)
+    if same_backend_file(accessor, paths[0], paths[1]):
+        err = (f"cp: '{paths[0].original}' and '{paths[1].original}' "
+               "are the same file\n")
+        return None, IOResult(exit_code=1, stderr=err.encode())
     recursive = r or R or a
     verbose_lines: list[str] = []
     if recursive:
