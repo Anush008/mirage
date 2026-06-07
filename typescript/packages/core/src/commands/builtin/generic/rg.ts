@@ -14,7 +14,6 @@
 
 import { exitOnEmpty } from '../../../io/stream.ts'
 import { IOResult, materialize, type ByteSource } from '../../../io/types.ts'
-import type { FindOptions } from '../../../resource/base.ts'
 import { FileType, PathSpec, type FileStat } from '../../../types.ts'
 import type { CommandFnResult, CommandOpts } from '../../config.ts'
 import { compilePattern, grepStream } from '../grep_helper.ts'
@@ -26,7 +25,6 @@ const ENC = new TextEncoder()
 
 type Stat = (p: PathSpec) => Promise<FileStat>
 type Readdir = (p: PathSpec) => Promise<string[]>
-type Find = (root: PathSpec, options: FindOptions) => Promise<string[]>
 type Stream = (p: PathSpec) => AsyncIterable<Uint8Array>
 
 interface RgFlags {
@@ -81,7 +79,6 @@ export async function rgGeneric(
   stat: Stat,
   readdir: Readdir,
   stream: Stream,
-  find: Find,
 ): Promise<CommandFnResult> {
   const [exprText] = texts
   if (exprText === undefined) {
@@ -122,7 +119,7 @@ export async function rgGeneric(
     }
   }
 
-  const readdirFn = (p: string): Promise<string[]> => find(makeSpec(p, first), { type: null })
+  const readdirFn = (p: string): Promise<string[]> => readdir(makeSpec(p, first))
   const statFn = (p: string): Promise<FileStat> => stat(makeSpec(p, first))
   const readBytesFn = (p: string): Promise<Uint8Array> => materialize(stream(makeSpec(p, first)))
 
@@ -204,5 +201,5 @@ export async function rgGeneric(
     return [out, io]
   }
 
-  return grepGeneric('rg', paths, texts, opts, stat, find, stream)
+  return grepGeneric('rg', paths, texts, opts, stat, readdir, stream)
 }

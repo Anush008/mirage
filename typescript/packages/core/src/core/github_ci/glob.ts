@@ -46,3 +46,16 @@ export async function resolveGlob(
   }
   return result
 }
+
+export function isCrossRunRoot(path: PathSpec): boolean {
+  let original = path.original
+  const prefix = path.prefix
+  if (prefix !== '' && original.startsWith(prefix)) {
+    const rest = original.slice(prefix.length)
+    if (prefix.endsWith('/') || rest === '' || rest.startsWith('/')) {
+      original = rest === '' ? '/' : rest
+    }
+  }
+  const stripped = original.replace(/^\/+/, '').replace(/\/+$/, '')
+  return stripped === '' || stripped === 'runs'
+}

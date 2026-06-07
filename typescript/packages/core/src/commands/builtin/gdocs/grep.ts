@@ -22,7 +22,6 @@ import { command, type CommandFnResult, type CommandOpts } from '../../config.ts
 import { specOf } from '../../spec/builtins.ts'
 import { prefixAggregate } from '../aggregators.ts'
 import { grepGeneric } from '../generic/grep.ts'
-import { findFromReaddir } from '../utils/find_from_readdir.ts'
 import { fileReadProvision } from './provision.ts'
 
 async function grepCommand(
@@ -36,7 +35,7 @@ async function grepCommand(
   const stat = (p: PathSpec): Promise<FileStat> => gdocsStat(accessor, p, opts.index ?? undefined)
   const readdir = (p: PathSpec): Promise<string[]> =>
     gdocsReaddir(accessor, p, opts.index ?? undefined)
-  return grepGeneric('grep', resolved, texts, opts, stat, findFromReaddir(readdir, stat), (p) =>
+  return grepGeneric('grep', resolved, texts, opts, stat, readdir, (p) =>
     gdocsStream(accessor, p, opts.index ?? undefined),
   )
 }

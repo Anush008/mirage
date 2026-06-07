@@ -21,7 +21,6 @@ import { type FileStat, ResourceName, type PathSpec } from '../../../types.ts'
 import { command, type CommandFnResult, type CommandOpts } from '../../config.ts'
 import { specOf } from '../../spec/builtins.ts'
 import { rgGeneric } from '../generic/rg.ts'
-import { findFromReaddir } from '../utils/find_from_readdir.ts'
 
 async function rgCommand(
   accessor: GDocsAccessor,
@@ -34,14 +33,8 @@ async function rgCommand(
   const stat = (p: PathSpec): Promise<FileStat> => gdocsStat(accessor, p, opts.index ?? undefined)
   const readdir = (p: PathSpec): Promise<string[]> =>
     gdocsReaddir(accessor, p, opts.index ?? undefined)
-  return rgGeneric(
-    resolved,
-    texts,
-    opts,
-    stat,
-    readdir,
-    (p) => gdocsStream(accessor, p, opts.index ?? undefined),
-    findFromReaddir(readdir, stat),
+  return rgGeneric(resolved, texts, opts, stat, readdir, (p) =>
+    gdocsStream(accessor, p, opts.index ?? undefined),
   )
 }
 
