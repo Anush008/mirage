@@ -18,53 +18,53 @@ from mirage.resource.ram.store import RAMStore
 
 
 def test_store_fork_shares_payload_by_reference():
-    parent = RAMStore(files={"/a": b"hello"},
-                      dirs={"/", "/d"},
-                      modified={"/a": "t"})
-    child = parent.fork()
-    assert child.files["/a"] is parent.files["/a"]
-    assert child.dirs == parent.dirs
-    assert child.modified == parent.modified
+    live = RAMStore(files={"/a": b"hello"},
+                    dirs={"/", "/d"},
+                    modified={"/a": "t"})
+    staged = live.fork()
+    assert staged.files["/a"] is live.files["/a"]
+    assert staged.dirs == live.dirs
+    assert staged.modified == live.modified
 
 
 def test_store_fork_write_isolates():
-    parent = RAMStore(files={"/a": b"hello"})
-    child = parent.fork()
-    child.files["/a"] = b"world"
-    child.files["/b"] = b"new"
-    assert parent.files["/a"] == b"hello"
-    assert "/b" not in parent.files
+    live = RAMStore(files={"/a": b"hello"})
+    staged = live.fork()
+    staged.files["/a"] = b"world"
+    staged.files["/b"] = b"new"
+    assert live.files["/a"] == b"hello"
+    assert "/b" not in live.files
 
 
 def test_store_fork_delete_isolates():
-    parent = RAMStore(files={"/a": b"hello"})
-    child = parent.fork()
-    del child.files["/a"]
-    assert "/a" in parent.files
+    live = RAMStore(files={"/a": b"hello"})
+    staged = live.fork()
+    del staged.files["/a"]
+    assert "/a" in live.files
 
 
 def test_store_fork_dirs_isolate():
-    parent = RAMStore(dirs={"/"})
-    child = parent.fork()
-    child.dirs.add("/sub")
-    assert "/sub" not in parent.dirs
+    live = RAMStore(dirs={"/"})
+    staged = live.fork()
+    staged.dirs.add("/sub")
+    assert "/sub" not in live.dirs
 
 
 def test_resource_fork_independent_store_and_index():
-    parent = RAMResource()
-    child = parent.fork()
-    assert child._store is not parent._store
-    assert child.accessor.store is child._store
-    assert child.index is not parent.index
+    live = RAMResource()
+    staged = live.fork()
+    assert staged._store is not live._store
+    assert staged.accessor.store is staged._store
+    assert staged.index is not live.index
 
 
 def test_resource_fork_shares_bytes_then_isolates():
-    parent = RAMResource()
-    parent._store.files["/a"] = b"hello"
-    child = parent.fork()
-    assert child._store.files["/a"] is parent._store.files["/a"]
-    child._store.files["/a"] = b"bye"
-    assert parent._store.files["/a"] == b"hello"
+    live = RAMResource()
+    live._store.files["/a"] = b"hello"
+    staged = live.fork()
+    assert staged._store.files["/a"] is live._store.files["/a"]
+    staged._store.files["/a"] = b"bye"
+    assert live._store.files["/a"] == b"hello"
 
 
 def test_base_resource_fork_shares_by_reference():

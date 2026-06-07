@@ -133,8 +133,9 @@ class BaseResource:
 
         Default is share-by-reference: a live, externally-owned backend
         (S3, Slack, GDrive, a Redis mount, ...) is the same object in
-        parent and child, so a write the child sends to it is real and
-        visible to both. In-process content backends override this to
-        return an isolated copy (RAM: copy-on-write; Disk: eager copy).
+        both the original (live) workspace and its staged fork, so a
+        write the staged side sends to it is real and visible to both.
+        In-process content backends override this to return an isolated
+        copy (RAM: copy-on-write; Disk: eager copy).
         """
         return self

@@ -13,7 +13,6 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import dataclasses
-import tempfile
 from pathlib import Path
 
 from mirage.accessor.disk import DiskAccessor
@@ -107,12 +106,7 @@ class DiskResource(BaseResource):
             target.write_bytes(data)
 
     def fork(self) -> "DiskResource":
-        """Fork by eager content copy into a fresh temp root.
-
-        Correct but not yet copy-on-write: the child's bytes are
-        duplicated on disk. A cheap copy-up overlay for disk mounts is a
-        follow-up.
-        """
-        child = DiskResource(root=tempfile.mkdtemp(prefix="mirage-disk-"))
-        child.load_state(self.get_state())
-        return child
+        raise NotImplementedError(
+            "DiskResource.fork() is not supported yet: disk isolation is "
+            "owned by Lane C (#178). Forking a workspace that has a disk "
+            "mount fails until the copy-up overlay lands.")

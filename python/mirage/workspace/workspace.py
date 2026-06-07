@@ -439,18 +439,19 @@ class Workspace:
     async def fork(self) -> "Workspace":
         """Cheap copy-on-write fork of this workspace.
 
-        Returns a child Workspace that isolates *internal* state from the
-        parent. The read/scratch cache and RAM-backed mounts are forked
-        copy-on-write: file *contents* (immutable bytes) are shared by
-        reference and only the lightweight key index is copied, so a
-        write or delete in the child never touches the parent and vice
-        versa. Sessions (cwd/env), history, and revision pins are copied
-        by value. Disk mounts are copied eagerly (correct, not yet
-        cheap). The child gets its own observer and job table.
+        Returns a *staged* Workspace that isolates *internal* state from
+        this *live* workspace. The read/scratch cache and RAM-backed
+        mounts are forked copy-on-write: file *contents* (immutable
+        bytes) are shared by reference and only the lightweight key index
+        is copied, so a write or delete in the staged workspace never
+        touches live and vice versa. Sessions (cwd/env), history, and
+        revision pins are copied by value. Disk mounts are copied eagerly
+        (correct, not yet cheap). The staged workspace gets its own
+        observer and job table.
 
         Remote backends (S3, Slack, GDrive, ...) are **shared by
-        reference**: a write the child sends to them is real and visible
-        to the parent and the outside world. Forking isolates agent
+        reference**: a write the staged workspace sends to them is real
+        and visible to live and the outside world. Forking isolates agent
         state, not the external world — staged/reversible external writes
         are a separate layer.
 

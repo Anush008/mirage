@@ -18,42 +18,42 @@ from mirage.cache.file.ram import RAMFileCacheStore
 
 
 def test_cache_fork_fresh_drain_tasks_and_size():
-    parent = RAMFileCacheStore()
-    child = parent.fork()
-    assert child.cache_size == parent.cache_size
-    assert child._drain_tasks is not parent._drain_tasks
-    assert child._drain_tasks == {}
-    assert child._entries is not parent._entries
+    live = RAMFileCacheStore()
+    staged = live.fork()
+    assert staged.cache_size == live.cache_size
+    assert staged._drain_tasks is not live._drain_tasks
+    assert staged._drain_tasks == {}
+    assert staged._entries is not live._entries
 
 
 @pytest.mark.asyncio
 async def test_cache_fork_payload_shared_then_isolated():
-    parent = RAMFileCacheStore()
-    await parent.set("/a", b"hello")
-    child = parent.fork()
-    assert await child.get("/a") == b"hello"
-    assert child._store.files["/a"] is parent._store.files["/a"]
+    live = RAMFileCacheStore()
+    await live.set("/a", b"hello")
+    staged = live.fork()
+    assert await staged.get("/a") == b"hello"
+    assert staged._store.files["/a"] is live._store.files["/a"]
 
-    await child.set("/a", b"world")
-    assert await parent.get("/a") == b"hello"
-    assert await child.get("/a") == b"world"
+    await staged.set("/a", b"world")
+    assert await live.get("/a") == b"hello"
+    assert await staged.get("/a") == b"world"
 
-    await child.remove("/a")
-    assert await parent.get("/a") == b"hello"
+    await staged.remove("/a")
+    assert await live.get("/a") == b"hello"
 
-    await child.set("/b", b"x")
-    assert await parent.get("/b") is None
+    await staged.set("/b", b"x")
+    assert await live.get("/b") is None
 
 
 @pytest.mark.asyncio
 async def test_cache_fork_size_accounting_diverges():
-    parent = RAMFileCacheStore()
-    await parent.set("/a", b"hello")
-    base = parent.cache_size
-    child = parent.fork()
-    await child.set("/b", b"world")
-    assert child.cache_size > base
-    assert parent.cache_size == base
+    live = RAMFileCacheStore()
+    await live.set("/a", b"hello")
+    base = live.cache_size
+    staged = live.fork()
+    await staged.set("/b", b"world")
+    assert staged.cache_size > base
+    assert live.cache_size == base
 
 
 def test_redis_cache_fork_raises():

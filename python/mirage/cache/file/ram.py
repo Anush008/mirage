@@ -49,20 +49,20 @@ class RAMFileCacheStore(RAMResource, FileCacheMixin, KeyLockMixin):
         """Cheap copy-on-write fork of the cache.
 
         Shares cached byte payloads by reference (``bytes`` is
-        immutable) while giving the child its own key index, LRU
-        metadata, and size counter, so the child's sets/removals never
-        affect the parent. In-flight drain tasks and per-key locks are
-        NOT inherited — the child starts with fresh ones and re-fetches
-        any stream that was still draining at fork time.
+        immutable) while giving the staged copy its own key index, LRU
+        metadata, and size counter, so the staged copy's sets/removals
+        never affect live. In-flight drain tasks and per-key locks are
+        NOT inherited — the staged copy starts with fresh ones and
+        re-fetches any stream that was still draining at fork time.
         """
-        child = RAMFileCacheStore(cache_limit=self._cache_limit,
-                                  max_drain_bytes=self.max_drain_bytes)
-        child._store.files = dict(self._store.files)
-        child._store.dirs = set(self._store.dirs)
-        child._store.modified = dict(self._store.modified)
-        child._entries = OrderedDict(self._entries)
-        child._cache_size = self._cache_size
-        return child
+        staged = RAMFileCacheStore(cache_limit=self._cache_limit,
+                                   max_drain_bytes=self.max_drain_bytes)
+        staged._store.files = dict(self._store.files)
+        staged._store.dirs = set(self._store.dirs)
+        staged._store.modified = dict(self._store.modified)
+        staged._entries = OrderedDict(self._entries)
+        staged._cache_size = self._cache_size
+        return staged
 
     async def get(self, key: str) -> bytes | None:
         async with self._lock_for(key):

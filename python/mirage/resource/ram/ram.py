@@ -103,11 +103,11 @@ class RAMResource(BaseResource):
     def fork(self) -> "RAMResource":
         """Copy-on-write fork sharing this resource's byte payloads.
 
-        The child gets a forked :class:`RAMStore` (shared contents, own
+        The staged copy gets a forked :class:`RAMStore` (shared contents, own
         key index) and a fresh empty index cache (directory listings are
         derived and re-built on demand).
         """
-        child = RAMResource()
-        child._store = self._store.fork()
-        child.accessor = RAMAccessor(child._store)
-        return child
+        staged = RAMResource()
+        staged._store = self._store.fork()
+        staged.accessor = RAMAccessor(staged._store)
+        return staged

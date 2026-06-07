@@ -26,8 +26,8 @@ class RAMStore:
 
         File *contents* are ``bytes`` (immutable), so they are shared by
         reference; only the lightweight key index (the dicts/set) is
-        copied. A write rebinds one key in the child; a delete pops one
-        key from the child. Neither touches the parent.
+        copied. A write rebinds one key in the staged copy; a delete pops
+        one key from the staged copy. Neither touches live.
         """
         return RAMStore(
             files=dict(self.files),

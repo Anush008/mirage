@@ -40,7 +40,8 @@ def _assert_forkable(ws) -> None:
         raise NotImplementedError(
             "Workspace.fork() requires the default RAM cache: a Redis-backed "
             "cache lives outside the process and cannot be cheaply forked "
-            "(an empty child would silently lose default-mount scratch).")
+            "(an empty staged workspace would silently lose "
+            "default-mount scratch).")
     if RedisIndexCacheStore is not None:
         for m in ws._registry.mounts():
             if isinstance(m.resource.index, RedisIndexCacheStore):
@@ -63,27 +64,31 @@ def _fork_resources(ws) -> dict:
     for m in ws._registry.mounts():
         if m.prefix in auto:
             continue
-        resources[m.prefix] = (m.resource.fork(), m.mode)
+        resources[m.prefix] = (
+            m.resource.fork(),
+            m.mode,
+            dict(m.command_safeguards),
+        )
     return resources
 
 
-def _copy_sessions(ws, child) -> None:
-    mgr = child._session_mgr
+def _copy_sessions(ws, staged) -> None:
+    mgr = staged._session_mgr
     for sess in ws._session_mgr.list():
         mgr._sessions[sess.session_id] = sess.fork()
         if sess.session_id not in mgr._locks:
             mgr._locks[sess.session_id] = asyncio.Lock()
 
 
-def _copy_history(ws, child) -> None:
-    if ws.history is None or child.history is None:
+def _copy_history(ws, staged) -> None:
+    if ws.history is None or staged.history is None:
         return
     for rec in ws.history.entries():
-        child.history.append(rec)
+        staged.history.append(rec)
 
 
-def _copy_revisions(ws, child) -> None:
-    for cm in child._registry.mounts():
+def _copy_revisions(ws, staged) -> None:
+    for cm in staged._registry.mounts():
         try:
             pm = ws._registry.mount_for_prefix(cm.prefix)
         except ValueError:
@@ -99,7 +104,7 @@ def _history_limit(ws) -> int | None:
 
 
 async def fork_workspace(ws):
-    """Build a copy-on-write child of ``ws``.
+    """Build a copy-on-write staged fork of ``ws`` (the live workspace).
 
     Constructed via ``type(ws)`` so this module never imports Workspace
     (avoids a cycle). Remote backends are shared by reference; RAM-backed
@@ -107,10 +112,10 @@ async def fork_workspace(ws):
     eagerly; sessions, history, and revision pins are copied by value.
 
     Args:
-        ws: the parent Workspace to fork.
+        ws: the live Workspace to fork.
     """
     _assert_forkable(ws)
-    child = type(ws)(
+    staged = type(ws)(
         _fork_resources(ws),
         consistency=ws._consistency,
         session_id=ws._default_session_id,
@@ -119,8 +124,8 @@ async def fork_workspace(ws):
         observe_prefix=ws.observer.prefix,
         _cache_store=ws._cache.fork(),
     )
-    child._current_agent_id = ws._current_agent_id
-    _copy_sessions(ws, child)
-    _copy_history(ws, child)
-    _copy_revisions(ws, child)
-    return child
+    staged._current_agent_id = ws._current_agent_id
+    _copy_sessions(ws, staged)
+    _copy_history(ws, staged)
+    _copy_revisions(ws, staged)
+    return staged
