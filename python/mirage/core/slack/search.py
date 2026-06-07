@@ -52,7 +52,7 @@ async def search_messages(
         "search.messages",
         params=params,
     )
-    return json.dumps(data, ensure_ascii=False).encode()
+    return json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode()
 
 
 def search_messages_stream(
@@ -117,7 +117,7 @@ async def search_files(
         "search.files",
         params=params,
     )
-    return json.dumps(data, ensure_ascii=False).encode()
+    return json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode()
 
 
 def search_files_stream(

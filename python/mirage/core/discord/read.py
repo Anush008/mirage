@@ -105,7 +105,8 @@ async def read(
         for m in members:
             user = m.get("user", {})
             if user.get("id") == entry_lookup.entry.id:
-                return json.dumps(m, ensure_ascii=False).encode()
+                return json.dumps(m, ensure_ascii=False,
+                                  separators=(",", ":")).encode()
         raise FileNotFoundError(key)
 
     raise FileNotFoundError(key)

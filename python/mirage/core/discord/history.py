@@ -118,5 +118,8 @@ async def get_history_jsonl(
         bytes: JSONL-encoded messages.
     """
     messages = await list_messages_for_day(config, channel_id, date_str)
-    lines = [json.dumps(m, ensure_ascii=False) for m in messages]
+    lines = [
+        json.dumps(m, ensure_ascii=False, separators=(",", ":"))
+        for m in messages
+    ]
     return ("\n".join(lines) + "\n").encode() if lines else b""

@@ -70,6 +70,7 @@ async def read(
         if lookup.entry is None:
             raise FileNotFoundError(key)
         user = await get_user_profile(accessor.config, lookup.entry.id)
-        return json.dumps(user, ensure_ascii=False).encode()
+        return json.dumps(user, ensure_ascii=False,
+                          separators=(",", ":")).encode()
 
     raise FileNotFoundError(key)

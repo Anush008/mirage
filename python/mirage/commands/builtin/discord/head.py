@@ -78,8 +78,9 @@ async def head(
                 },
             )
             msgs.sort(key=lambda m: int(m["id"]))
-            jsonl = "\n".join(json.dumps(m, ensure_ascii=False)
-                              for m in msgs) + "\n"
+            jsonl = "\n".join(
+                json.dumps(m, ensure_ascii=False, separators=(",", ":"))
+                for m in msgs) + "\n"
             return generic_head(jsonl.encode(), n=lines), IOResult()
 
         paths = await resolve_glob(accessor, paths, index)
