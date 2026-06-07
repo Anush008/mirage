@@ -136,6 +136,7 @@ class BaseResource:
         both the original (live) workspace and its staged fork, so a
         write the staged side sends to it is real and visible to both.
         In-process content backends override this to return an isolated
-        copy (RAM: copy-on-write; Disk: eager copy).
+        copy (RAM: copy-on-write). Disk is not yet forkable (raises
+        NotImplementedError — deferred to Lane C, #178).
         """
         return self

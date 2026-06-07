@@ -108,8 +108,9 @@ async def fork_workspace(ws):
 
     Constructed via ``type(ws)`` so this module never imports Workspace
     (avoids a cycle). Remote backends are shared by reference; RAM-backed
-    mounts and the cache are forked copy-on-write; disk mounts are copied
-    eagerly; sessions, history, and revision pins are copied by value.
+    mounts and the cache are forked copy-on-write; disk mounts are not
+    yet forkable (raise ``NotImplementedError`` — deferred to Lane C,
+    #178); sessions, history, and revision pins are copied by value.
 
     Args:
         ws: the live Workspace to fork.

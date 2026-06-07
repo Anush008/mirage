@@ -445,9 +445,9 @@ class Workspace:
         bytes) are shared by reference and only the lightweight key index
         is copied, so a write or delete in the staged workspace never
         touches live and vice versa. Sessions (cwd/env), history, and
-        revision pins are copied by value. Disk mounts are copied eagerly
-        (correct, not yet cheap). The staged workspace gets its own
-        observer and job table.
+        revision pins are copied by value. Disk mounts are not yet
+        forkable (raise NotImplementedError — deferred to Lane C, #178).
+        The staged workspace gets its own observer and job table.
 
         Remote backends (S3, Slack, GDrive, ...) are **shared by
         reference**: a write the staged workspace sends to them is real
