@@ -12,8 +12,9 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from mirage.observe.context import (push_mount_prefix, push_revisions, record,
-                                    record_stream, reset_revisions,
+from mirage.observe.context import (branch_for, push_branch, push_mount_prefix,
+                                    push_revisions, record, record_stream,
+                                    reset_branch, reset_revisions,
                                     revision_for, start_recording,
                                     stop_recording)
 
@@ -169,3 +170,34 @@ def test_revision_for_with_none_context():
         assert revision_for("/s3/a") is None
     finally:
         reset_revisions(token)
+
+
+def test_branch_for_default_is_none():
+    assert branch_for() is None
+
+
+def test_push_branch_then_reset_restores_none():
+    sentinel = object()
+    token = push_branch(sentinel)
+    try:
+        assert branch_for() is sentinel
+    finally:
+        reset_branch(token)
+    assert branch_for() is None
+
+
+def test_push_branch_nested_restores_previous():
+    outer = object()
+    inner = object()
+    outer_token = push_branch(outer)
+    try:
+        assert branch_for() is outer
+        inner_token = push_branch(inner)
+        try:
+            assert branch_for() is inner
+        finally:
+            reset_branch(inner_token)
+        assert branch_for() is outer
+    finally:
+        reset_branch(outer_token)
+    assert branch_for() is None

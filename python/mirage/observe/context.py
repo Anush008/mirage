@@ -288,3 +288,57 @@ async def with_revisions(revisions: dict[str, str] | None,
             return
         reset_revisions(token)
         yield chunk
+
+
+_active_branch: ContextVar[object | None] = ContextVar("_active_branch",
+                                                       default=None)
+
+
+def push_branch(branch: object):
+    """Bind the active branch for the current async context.
+
+    A branch is a copy-on-write staged workspace (a forked Workspace).
+    The VFS dispatcher consults :func:`branch_for` on every op so that,
+    when a branch is bound, reads can be served from the branch's
+    staging layer first and writes to share-by-ref mounts can be
+    diverted into it instead of the live backend. Entry points that
+    activate a branch push it here before dispatching, so any op fired
+    inside sees the binding without explicit threading.
+
+    Returns the token from ``ContextVar.set`` so callers can restore the
+    previous state via :func:`reset_branch`. Task-isolated: the
+    ContextVar copy is per-task, so concurrent contexts don't see each
+    other's branch.
+
+    Args:
+        branch (object): The active branch (Lane A's ``Branch``). Typed
+            as ``object`` to keep this module leaf-ward — the real class
+            lives in the workspace layer and importing it would cycle.
+
+    Returns:
+        Token: passable to ``reset_branch``.
+    """
+    return _active_branch.set(branch)
+
+
+def reset_branch(token) -> None:
+    """Restore the previous branch after a :func:`push_branch`.
+
+    Args:
+        token: The token returned by ``push_branch``.
+    """
+    _active_branch.reset(token)
+
+
+def branch_for() -> object | None:
+    """Return the branch bound to the current async context, if any.
+
+    The dispatcher calls this to decide whether to route an op through a
+    branch's staging layer. Returns ``None`` when no branch is bound
+    (the default), in which case dispatch behaves exactly as it does
+    without any branch machinery.
+
+    Returns:
+        object | None: The active branch, or None if none is bound.
+    """
+    return _active_branch.get()
