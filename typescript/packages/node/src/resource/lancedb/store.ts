@@ -13,8 +13,12 @@
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import type { Connection, Table } from '@lancedb/lancedb'
-import { connect } from '@lancedb/lancedb'
-import type { LanceDriver, LanceRow, LanceDBConfigResolved } from '@struktoai/mirage-core'
+import {
+  loadOptionalPeer,
+  type LanceDriver,
+  type LanceRow,
+  type LanceDBConfigResolved,
+} from '@struktoai/mirage-core'
 
 function toStr(value: unknown): string {
   if (value === null || value === undefined) return ''
@@ -51,6 +55,10 @@ export class LanceDBStore implements LanceDriver {
         options.region = this.config.region
         if (this.config.hostOverride !== null) options.hostOverride = this.config.hostOverride
       }
+      const { connect } = await loadOptionalPeer(() => import('@lancedb/lancedb'), {
+        feature: 'LanceDBResource',
+        packageName: '@lancedb/lancedb',
+      })
       this.db = await connect(this.config.uri, options)
     }
     return this.db

@@ -46,7 +46,8 @@ class StubEmbedding(EmbeddingFunction):
         return [_vec(str(item)) for item in query]
 
     def compute_source_embeddings(self, texts, *args, **kwargs):
-        items = texts.to_pylist() if isinstance(texts, pa.Array) else list(texts)
+        items = texts.to_pylist() if isinstance(texts,
+                                                pa.Array) else list(texts)
         return [_vec(str(item)) for item in items]
 
 
@@ -59,10 +60,30 @@ def _ensure_registered() -> None:
 
 
 _ROWS = [
-    {"id": 1, "label": "cat", "kind": "big", "name": "a big orange cat"},
-    {"id": 2, "label": "cat", "kind": "small", "name": "a small grey cat"},
-    {"id": 3, "label": "dog", "kind": "big", "name": "a big brown dog"},
-    {"id": 4, "label": "dog", "kind": "small", "name": "a small white dog"},
+    {
+        "id": 1,
+        "label": "cat",
+        "kind": "big",
+        "name": "a big orange cat"
+    },
+    {
+        "id": 2,
+        "label": "cat",
+        "kind": "small",
+        "name": "a small grey cat"
+    },
+    {
+        "id": 3,
+        "label": "dog",
+        "kind": "big",
+        "name": "a big brown dog"
+    },
+    {
+        "id": 4,
+        "label": "dog",
+        "kind": "small",
+        "name": "a small white dog"
+    },
 ]
 
 
@@ -82,8 +103,9 @@ def lance_config(tmp_path) -> LanceDBConfig:
     uri = str(tmp_path / "db")
     db = lancedb.connect(uri)
     table = db.create_table("animals", schema=Animal)
-    table.add([{**row, "image_bytes": f"PNG-{row['id']}".encode()}
-               for row in _ROWS])
+    table.add([{
+        **row, "image_bytes": f"PNG-{row['id']}".encode()
+    } for row in _ROWS])
     return LanceDBConfig(
         uri=uri,
         group_by=["label", "kind"],
