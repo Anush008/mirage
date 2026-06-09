@@ -29,7 +29,9 @@ async function tailCommand(
 ): Promise<CommandFnResult> {
   const resolved =
     paths.length > 0 ? await resolveGlob(accessor, paths, opts.index ?? undefined) : []
-  return tailGeneric(resolved, texts, opts, (p) => dropboxStream(accessor, p, opts.index ?? undefined))
+  const stream = (p: PathSpec): AsyncIterable<Uint8Array> =>
+    dropboxStream(accessor, p, opts.index ?? undefined)
+  return tailGeneric(resolved, texts, opts, stream)
 }
 
 export const DROPBOX_TAIL = command({

@@ -29,7 +29,9 @@ async function wcCommand(
 ): Promise<CommandFnResult> {
   const resolved =
     paths.length > 0 ? await resolveGlob(accessor, paths, opts.index ?? undefined) : []
-  return wcGeneric(resolved, texts, opts, (p) => boxStream(accessor, p, opts.index ?? undefined))
+  const stream = (p: PathSpec): AsyncIterable<Uint8Array> =>
+    boxStream(accessor, p, opts.index ?? undefined)
+  return wcGeneric(resolved, texts, opts, stream)
 }
 
 export const BOX_WC = command({
