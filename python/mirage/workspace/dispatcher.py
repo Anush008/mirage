@@ -28,22 +28,23 @@ _DISPATCH_WRITE_OPS = WRITE_OPS
 
 
 def _needs_staging(mount: Mount) -> bool:
-    """Whether writes to ``mount`` must be diverted into a branch's
-    staging layer instead of hitting the live backend.
+    """Whether a bound branch must divert this mount's content writes
+    into its staging layer instead of the live backend.
 
-    True iff the resource shares its backend by reference across a fork
-    — i.e. it did not override ``BaseResource.fork`` — so the live and
-    staged workspaces hold the same live object and a staged write would
-    otherwise leak to the live side. S3 / Slack / GDrive and an
-    in-memory-but-externally-owned Redis mount all share by reference;
-    RAM / cache / Disk override ``fork`` to isolate on the fork and need
-    no diversion.
-
-    Deliberately NOT keyed on ``is_remote``: a Redis mount is
-    ``is_remote=False`` yet still shares by reference and must be staged.
-    F4 (#170) formalizes this into a resource strategy flag / WriteLayer
-    protocol and may swap this predicate's internals — but not its call
-    site in :meth:`Dispatcher.dispatch`.
+    Tests override-identity — ``type(mount.resource).fork is
+    BaseResource.fork`` — i.e. "did the resource leave ``fork`` at the
+    share-by-reference default?" For today's backends that coincides with
+    actual share-by-ref: RAM / cache / Disk override ``fork`` to isolate
+    on the fork (→ no staging); S3 / Slack / GDrive and an
+    ``is_remote=False`` Redis mount inherit the default and share one live
+    object (→ stage). It is an approximation, not a behavioral test — a
+    resource that overrode ``fork`` yet still returned a shared live
+    client would be misclassified as isolating and leak staged writes to
+    live; none do today. Deliberately NOT keyed on ``is_remote`` (Redis is
+    local yet shared). F4 (#170) replaces this with a resource strategy
+    flag, ideally fail-closed (an explicit ``isolates_on_fork`` opt-out so
+    unknown resources default to staging) — swapping the internals here,
+    never the call site.
 
     Args:
         mount (Mount): the mount the op resolved to.
@@ -52,12 +53,16 @@ def _needs_staging(mount: Mount) -> bool:
 
 
 def policy_for(mount: Mount) -> object | None:
-    """Staging/commit policy for ``mount`` — placeholder stub.
+    """Staging/commit policy for ``mount`` — deferred stub, ``None`` today.
 
-    Returns ``None`` today: no policy is defined until the commit
-    contract lands. F3/F4 (#169/#170) and the commit lane (D) fill in
-    the real policy type and per-mount selection; this stub freezes the
-    call shape so they need not reopen the dispatcher.
+    Public (unlike the private ``_needs_staging``) because it is a seam
+    other lanes import, parallel to ``READ_OPS`` / ``WRITE_OPS``. Unlike
+    ``staged_read`` / ``divert_write`` it has no inert call site in
+    ``dispatch``: policy is expected to be resolved at commit time,
+    outside the per-op path, so this only reserves the name rather than
+    anchoring a dispatch call site. F3/F4 (#169/#170) and the commit lane
+    (D) define the real policy type and selection, and may revise this
+    signature if they need op / path / branch context.
 
     Args:
         mount (Mount): the mount to resolve a policy for.
@@ -78,11 +83,19 @@ class Dispatcher:
 
     Frozen seam (Phase 0 / F2, #168): ``dispatch`` carries inert branch
     hooks — a ``branch_for()`` lookup, the ``_needs_staging`` gate, and
-    ``staged_read`` / ``divert_write`` calls on the bound branch — that
-    are dead until Lane A binds a branch. After this freeze the feature
-    lanes (A–J) plug in only by implementing those branch methods; they
-    never reopen ``dispatch``. dispatcher.py is read-only for all
-    downstream lanes.
+    ``staged_read`` / ``divert_write`` calls on the bound branch — dead
+    until Lane A binds a branch. Scope is deliberately narrow: the seam
+    covers content read/write routing only (``READ_OPS`` / ``WRITE_OPS``).
+    ``stat`` / ``readdir`` / ``find`` are intentionally not diverted —
+    with a branch bound they fall through to the live backend (content-
+    only staging; metadata stays live). Directory mutations (``mkdir`` /
+    ``rmdir`` / ``rename``) run via ``mount.execute_cmd`` and never
+    traverse ``dispatch`` at all, so they are outside this seam by
+    construction. Within that scope the feature lanes (A–J) extend
+    dispatch only by implementing the branch methods, never by reopening
+    this content read/write routing. Staging metadata or directory CoW,
+    if a later arc needs it, is owned by the ``execute_cmd`` / ``IOResult``
+    write-set path or a separate metadata seam — not by editing this block.
     """
 
     def __init__(self, registry: MountRegistry, cache,
@@ -96,18 +109,15 @@ class Dispatcher:
         mount = self._registry.mount_for(path.original)
         assert_mount_allowed(mount.prefix)
         branch = branch_for()
-        # Dead seam until Lane A binds a branch: ``branch`` is None on
-        # every path today, so this block never runs and dispatch stays
-        # byte-for-byte. When a branch is bound, a share-by-ref mount
-        # serves reads through its staging layer and diverts writes into
-        # it. ``staged_read`` / ``divert_write`` are the frozen contract
-        # Lane A implements; both return ``(result, IOResult)`` like
-        # dispatch. F4 may refine ``_needs_staging`` internals, never
-        # this call site — dispatcher.py is read-only for other lanes.
+        # Dead seam today: ``branch`` is None on every path (Lane A binds
+        # it later), so this block never runs and dispatch stays byte-for-
+        # byte. Routing contract, scope, and the read-only invariant: see
+        # the class docstring. staged_read / divert_write return
+        # ``(result, IOResult)`` like dispatch.
         if branch is not None and _needs_staging(mount):
-            if op in READ_OPS:
+            if op in _DISPATCH_READ_OPS:
                 return await branch.staged_read(mount, path, **kwargs)
-            if op in WRITE_OPS:
+            if op in _DISPATCH_WRITE_OPS:
                 return await branch.divert_write(mount, op, path, **kwargs)
         cacheable = mount.resource.is_remote is True
 
