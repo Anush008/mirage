@@ -24,5 +24,6 @@ export const HF_WC = command({
   spec: specOf('wc'),
   fn: (accessor: HfAccessor, paths, texts, opts) =>
     wcGeneric(paths, texts, opts, (p) => hfStream(accessor, p)),
+  provision: fileReadProvision,
   aggregate: wcAggregate,
 })

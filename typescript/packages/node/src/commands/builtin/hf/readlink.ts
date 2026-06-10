@@ -13,12 +13,7 @@
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import { HF_RESOURCES } from '../../../accessor/hf.ts'
-import {
-  command,
-  readlinkGeneric,
-  specOf,
-  type Accessor,
-} from '@struktoai/mirage-core'
+import { command, readlinkGeneric, specOf, type Accessor } from '@struktoai/mirage-core'
 
 export const HF_READLINK = command({
   name: 'readlink',

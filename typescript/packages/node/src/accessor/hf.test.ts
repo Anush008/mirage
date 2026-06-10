@@ -13,12 +13,7 @@
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import { describe, expect, it } from 'vitest'
-import {
-  HfBucketsAccessor,
-  HfDatasetsAccessor,
-  HfModelsAccessor,
-  HfSpacesAccessor,
-} from './hf.ts'
+import { HfBucketsAccessor, HfDatasetsAccessor, HfModelsAccessor, HfSpacesAccessor } from './hf.ts'
 
 describe('HfAccessor.operatorOptions', () => {
   it('builds minimal options for a public model', () => {

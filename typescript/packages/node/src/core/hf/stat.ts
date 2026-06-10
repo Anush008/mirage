@@ -77,7 +77,7 @@ export async function stat(
     const mdDir = await op.stat(`${stripped}/`)
     if (mdDir.isDirectory()) {
       return new FileStat({
-        name: stripped.split('/').pop() || '/',
+        name: stripped.split('/').pop() ?? '/',
         type: FileType.DIRECTORY,
       })
     }

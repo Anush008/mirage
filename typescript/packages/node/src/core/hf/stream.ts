@@ -46,7 +46,7 @@ export async function* stream(
     throw err
   }
   const buf = Buffer.alloc(chunkSize)
-  while (true) {
+  for (;;) {
     const n = Number(await reader.read(buf))
     if (n <= 0) break
     const chunk = new Uint8Array(buf.subarray(0, n))

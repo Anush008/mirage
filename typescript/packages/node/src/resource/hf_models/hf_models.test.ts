@@ -19,8 +19,19 @@ import { HfBucketsResource } from '../hf_buckets/hf_buckets.ts'
 import { HfModelsResource } from './hf_models.ts'
 
 const PY_OPS = [
-  'read_bytes', 'readdir', 'stat', 'read_stream', 'range_read', 'du_total',
-  'du_all', 'exists', 'find_flat', 'write', 'create', 'unlink', 'mkdir',
+  'read_bytes',
+  'readdir',
+  'stat',
+  'read_stream',
+  'range_read',
+  'du_total',
+  'du_all',
+  'exists',
+  'find_flat',
+  'write',
+  'create',
+  'unlink',
+  'mkdir',
 ]
 
 describe('HfModelsResource', () => {

@@ -27,6 +27,7 @@ import { unlink as hfUnlink } from '../../../core/hf/unlink.ts'
 
 const ENC = new TextEncoder()
 
+// eslint-disable-next-line @typescript-eslint/require-await
 async function* lines(parts: readonly string[]): AsyncIterable<Uint8Array> {
   for (const part of parts) yield ENC.encode(`${part}\n`)
 }

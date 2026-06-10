@@ -40,9 +40,11 @@ describe('hf stream', () => {
   it('maps NotFound to ENOENT', async () => {
     const accessor = accessorWith({})
     const iterate = async () => {
-      for await (const _chunk of stream(accessor, PathSpec.fromStrPath('/missing'))) {
-        // drain
+      let total = 0
+      for await (const chunk of stream(accessor, PathSpec.fromStrPath('/missing'))) {
+        total += chunk.byteLength
       }
+      return total
     }
     await expect(iterate()).rejects.toMatchObject({ code: 'ENOENT' })
   })

@@ -72,10 +72,18 @@ function matchesFilters(
     (options.mtimeMax !== null && options.mtimeMax !== undefined)
   ) {
     if (meta.mtime === null) return false
-    if (options.mtimeMin !== null && options.mtimeMin !== undefined && meta.mtime < options.mtimeMin) {
+    if (
+      options.mtimeMin !== null &&
+      options.mtimeMin !== undefined &&
+      meta.mtime < options.mtimeMin
+    ) {
       return false
     }
-    if (options.mtimeMax !== null && options.mtimeMax !== undefined && meta.mtime > options.mtimeMax) {
+    if (
+      options.mtimeMax !== null &&
+      options.mtimeMax !== undefined &&
+      meta.mtime > options.mtimeMax
+    ) {
       return false
     }
   }

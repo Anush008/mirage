@@ -35,7 +35,7 @@ export abstract class HfAccessor extends Accessor {
 
   get repoId(): string {
     const config = this.config as { bucket?: string; repoId?: string }
-    return config.repoId ?? (config.bucket as string)
+    return config.repoId ?? config.bucket ?? ''
   }
 
   abstract get bucketUri(): string

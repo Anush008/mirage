@@ -36,7 +36,7 @@ export async function read(
     readOptions.offset = BigInt(options.offset)
   }
   if (options.size !== undefined) {
-    if (readOptions.offset === undefined) readOptions.offset = 0n
+    readOptions.offset ??= 0n
     readOptions.size = BigInt(options.size)
   }
   const startMs = performance.now()

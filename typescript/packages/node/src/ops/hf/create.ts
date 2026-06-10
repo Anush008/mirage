@@ -12,7 +12,6 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-
 import type { PathSpec, RegisteredOp } from '@struktoai/mirage-core'
 import { HF_RESOURCES, type HfAccessor } from '../../accessor/hf.ts'
 import { create as coreCreate } from '../../core/hf/create.ts'
