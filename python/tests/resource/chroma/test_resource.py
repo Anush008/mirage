@@ -25,6 +25,7 @@ def test_chroma_resource_registers_expected_commands_and_ops():
     commands = {item.name for item in resource.commands()}
     ops = {item.name for item in resource.ops_list()}
 
-    assert {"cat", "ls", "grep", "find", "head", "tail", "tree",
-            "search"}.issubset(commands)
+    assert {
+        "cat", "ls", "grep", "find", "head", "tail", "tree", "chroma-query"
+    }.issubset(commands)
     assert {"read", "readdir", "stat", "grep", "search"}.issubset(ops)

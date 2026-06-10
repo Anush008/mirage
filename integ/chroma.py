@@ -1,15 +1,36 @@
+# ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
+
 import asyncio
+import base64
+import gzip
 import json
-import re
+import os
 import sys
-from functools import partial
+import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
+import chromadb  # noqa: E402
+
 from mirage import MountMode, Workspace  # noqa: E402
 from mirage.resource.chroma import ChromaConfig, ChromaResource  # noqa: E402
 
+CHROMA_HOST = os.environ.get("CHROMA_HOST", "localhost")
+CHROMA_PORT = int(os.environ.get("CHROMA_PORT", "8000"))
+EMBED_DIM = 8
 MOUNT = "/knowledge/"
 
 PATH_TREE: dict[str, dict] = {
@@ -125,7 +146,7 @@ CHUNKS: dict[str, list[dict]] = {
             },
         },
         {
-            "document": "You may request deletion of your data at any time.",
+            "document": "We never sell personal information to third parties.",
             "metadata": {
                 "page_slug": "policies/privacy.md",
                 "chunk_index": 1
@@ -140,124 +161,10 @@ CHUNKS: dict[str, list[dict]] = {
                 "chunk_index": 0
             },
         },
-        {
-            "document": "v1.5 introduced encrypted data exports.",
-            "metadata": {
-                "page_slug": "CHANGELOG.md",
-                "chunk_index": 1
-            },
-        },
     ],
 }
 
-
-class FakeCollection:
-
-    def __init__(self) -> None:
-        self.path_tree = json.dumps(PATH_TREE)
-        self.get_count = 0
-        self.query_count = 0
-
-    async def get(self, **kwargs):
-        self.get_count += 1
-        ids = kwargs.get("ids")
-        if ids == ["__path_tree__"]:
-            return {"documents": [self.path_tree]}
-
-        where = kwargs.get("where") or {}
-        slug = where.get("page_slug")
-        if isinstance(slug, dict):
-            slug_in = slug.get("$in")
-            slug_eq = slug.get("$eq")
-            if slug_in is not None:
-                where_doc = kwargs.get("where_document") or {}
-                contains = where_doc.get("$contains")
-                regex = where_doc.get("$regex")
-                docs, metas = [], []
-                for s in slug_in:
-                    for chunk in CHUNKS.get(s, []):
-                        document = chunk["document"]
-                        if contains is not None:
-                            matched = contains in document
-                        elif regex is not None:
-                            matched = re.search(regex, document) is not None
-                        else:
-                            matched = True
-                        if matched:
-                            docs.append(document)
-                            metas.append(chunk["metadata"])
-                return {"documents": docs, "metadatas": metas}
-            slug = slug_eq
-
-        if slug is not None:
-            items = CHUNKS.get(slug, [])
-            offset = kwargs.get("offset") or 0
-            limit = kwargs.get("limit")
-            if limit is not None:
-                items = items[offset:offset + limit]
-            elif offset:
-                items = items[offset:]
-            return {
-                "documents": [c["document"] for c in items],
-                "metadatas": [c["metadata"] for c in items],
-            }
-        return {"documents": [], "metadatas": []}
-
-    async def query(self, **kwargs):
-        self.query_count += 1
-        query_texts = kwargs.get("query_texts", [""])[0]
-        n_results = kwargs.get("n_results", 10)
-        where = kwargs.get("where")
-        scoped = None
-        if where:
-            scoped = set(where.get("page_slug", {}).get("$in", []))
-
-        lowered = query_texts.lower()
-        scored: list[tuple[float, str, str]] = []
-        if "throttl" in lowered or "rate" in lowered or "429" in lowered:
-            scored = [
-                (0.08, "guides/auth.md",
-                 "Requests are rate limited to 100 calls per minute per token."
-                 ),
-                (0.12, "guides/auth.md",
-                 "If you exceed the limit you receive HTTP 429"
-                 " and must back off."),
-            ]
-        elif "refund" in lowered or "money" in lowered:
-            scored = [
-                (0.09, "policies/refunds.md",
-                 "Refunds are available within 30 days of purchase."),
-                (0.16, "policies/refunds.md",
-                 "Approved refunds are processed within five business days."),
-            ]
-        elif "encrypt" in lowered or "privacy" in lowered:
-            scored = [
-                (0.11, "policies/privacy.md",
-                 "Customer data is stored encrypted at rest and in transit."),
-            ]
-        else:
-            for slug, chunks in sorted(CHUNKS.items()):
-                text = " ".join(c["document"] for c in chunks)
-                scored.append((0.2, slug, text))
-
-        if scoped is not None:
-            scored = [(d, s, t) for d, s, t in scored if s in scoped]
-        scored = scored[:n_results]
-
-        return {
-            "documents": [[t for _, _, t in scored]],
-            "metadatas": [[{
-                "page_slug": s
-            } for _, s, _ in scored]],
-            "distances": [[d for d, _, _ in scored]],
-        }
-
-
-async def _get_collection(collection):
-    return collection
-
-
-PER_MOUNT_CASES: list[tuple[str, str]] = [
+CASES: list[tuple[str, str]] = [
     ("ls", "ls {root}"),
     ("ls_guides", "ls {root}guides/"),
     ("tree", "tree {root}"),
@@ -287,28 +194,44 @@ PER_MOUNT_CASES: list[tuple[str, str]] = [
      " | wc -l"),
 ]
 
-SEARCH_CASES: list[tuple[str, str]] = [
-    ("search_throttle", 'search "how am I throttled" {root}'),
-    ("search_scoped_refund", 'search "money back" {root}policies/'),
-    ("search_encrypted", "search encrypted {root}"),
-]
+
+def encoded_path_tree() -> str:
+    # gzip+base64 variant so the integ covers parse_path_tree's
+    # encoded branch (unit tests cover the plain JSON branch)
+    raw = json.dumps(PATH_TREE).encode()
+    return base64.b64encode(gzip.compress(raw)).decode()
 
 
-def _build_workspace() -> tuple[Workspace, FakeCollection]:
-    collection = FakeCollection()
-    config = ChromaConfig(
-        host="localhost",
-        port=8000,
-        collection_name="knowledge",
-    )
-    resource = ChromaResource(config=config)
-    resource.accessor._collection = collection
-    resource.accessor.get_collection = partial(_get_collection, collection)
-    ws = Workspace({MOUNT: resource}, mode=MountMode.READ)
-    return ws, collection
+def embedding_for(position: int) -> list[float]:
+    vector = [0.0] * EMBED_DIM
+    vector[position % EMBED_DIM] = 1.0
+    return vector
 
 
-async def _run(ws: Workspace, name: str, cmd: str) -> None:
+async def seed_collection(collection_name: str) -> None:
+    client = await chromadb.AsyncHttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+    collection = await client.create_collection(collection_name)
+    ids = ["__path_tree__"]
+    documents = [encoded_path_tree()]
+    metadatas: list[dict] = [{"kind": "path_tree"}]
+    embeddings = [embedding_for(0)]
+    position = 1
+    for chunks in CHUNKS.values():
+        for chunk in chunks:
+            slug = chunk["metadata"]["page_slug"]
+            index = chunk["metadata"]["chunk_index"]
+            ids.append(f"{slug}#{index}")
+            documents.append(chunk["document"])
+            metadatas.append(chunk["metadata"])
+            embeddings.append(embedding_for(position))
+            position += 1
+    await collection.add(ids=ids,
+                         documents=documents,
+                         metadatas=metadatas,
+                         embeddings=embeddings)
+
+
+async def run_case(ws: Workspace, name: str, cmd: str) -> None:
     result = await ws.execute(cmd)
     out = await result.stdout_str()
     print(f"=== {name} ===")
@@ -316,11 +239,19 @@ async def _run(ws: Workspace, name: str, cmd: str) -> None:
 
 
 async def main() -> None:
-    ws, collection = _build_workspace()
-    for name, tmpl in PER_MOUNT_CASES:
-        await _run(ws, name, tmpl.format(root=MOUNT))
-    for name, tmpl in SEARCH_CASES:
-        await _run(ws, name, tmpl.format(root=MOUNT))
+    collection_name = f"mirage-integ-{uuid.uuid4().hex[:8]}"
+    await seed_collection(collection_name)
+    config = ChromaConfig(
+        host=CHROMA_HOST,
+        port=CHROMA_PORT,
+        collection_name=collection_name,
+    )
+    ws = Workspace({MOUNT: ChromaResource(config=config)}, mode=MountMode.READ)
+    # Vector search (the `search` command) is not exercised here: the thin
+    # client ships no embedding function for query_texts. It is covered by
+    # unit tests (tests/core/chroma/test_search.py).
+    for name, tmpl in CASES:
+        await run_case(ws, name, tmpl.format(root=MOUNT))
 
 
 if __name__ == "__main__":

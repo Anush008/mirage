@@ -437,6 +437,7 @@
                 "pages": [
                   "typescript/setup/mongodb",
                   "typescript/setup/postgres",
+                  "typescript/setup/chroma",
                   "typescript/setup/lancedb"
                 ]
               },

@@ -70,6 +70,5 @@ def test_virtual_key_for_root():
 
 
 def test_virtual_key_for_unprefixed():
-    path = PathSpec(original="/guides/quickstart",
-                    directory="/guides")
+    path = PathSpec(original="/guides/quickstart", directory="/guides")
     assert virtual_key_for(path) == "/guides/quickstart"

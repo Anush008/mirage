@@ -7,7 +7,7 @@ description: Mount a ChromaDB collection as a read-only virtual filesystem.
 The Chroma resource exposes an existing ChromaDB collection as text files
 mounted at a prefix such as `/knowledge/`. It is useful when you already have a
 chunked knowledge base in Chroma and want agents to use normal filesystem
-commands like `ls`, `cat`, `grep`, `find`, and `search`.
+commands like `ls`, `cat`, `grep`, `find`, and `chroma-query`.
 
 For collection setup, see [Chroma Setup](/python/setup/chroma).
 
@@ -94,13 +94,13 @@ grep -n "API key" /knowledge/guides/quickstart.md
 
 ## Vector Search
 
-The `search` command calls Chroma's native vector query API. Use it when
+The `chroma-query` command calls Chroma's native vector query API. Use it when
 semantic similarity matters more than exact text matching.
 
 ```bash
-search "how do I get started" /knowledge/
-search --top-k 5 "billing policy" /knowledge/policies/
-search --top-k 3 "API authentication" /knowledge/guides/quickstart.md
+chroma-query "how do I get started" /knowledge/
+chroma-query --top-k 5 "billing policy" /knowledge/policies/
+chroma-query --top-k 3 "API authentication" /knowledge/guides/quickstart.md
 ```
 
 Results are emitted one hit per line:
@@ -125,7 +125,7 @@ File content is still read from Chroma when commands materialize document text.
 
 Runnable examples live under `examples/python/chroma/`:
 
-- [`chroma.py`](https://github.com/StruktoAI/mirage/blob/main/examples/python/chroma/chroma.py) — command workflow with `ls`, `tree`, `find`, `cat`, `head`, `tail`, `grep`, and `search`.
+- [`chroma.py`](https://github.com/StruktoAI/mirage/blob/main/examples/python/chroma/chroma.py) — command workflow with `ls`, `tree`, `find`, `cat`, `head`, `tail`, `grep`, and `chroma-query`.
 - [`chroma_vfs.py`](https://github.com/StruktoAI/mirage/blob/main/examples/python/chroma/chroma_vfs.py) — in-process VFS workflow with `os.listdir()`, `open()`, and `os.path.*`.
 
 ## Shell Commands
@@ -138,4 +138,4 @@ Runnable examples live under `examples/python/chroma/`:
 | `cat` | Read full file text assembled from Chroma chunks |
 | `head` / `tail` | Read the first or last lines/bytes |
 | `grep` | Exact or regex matching over assembled file text |
-| `search` | Vector retrieval through Chroma |
+| `chroma-query` | Vector retrieval through Chroma |

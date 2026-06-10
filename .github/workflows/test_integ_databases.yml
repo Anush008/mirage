@@ -7,9 +7,8 @@ name: Integ (databases)
       - integ/mongodb.py
       - integ/truth_mongodb.txt
       - integ/chroma.py
-      - integ/chroma_live.py
+      - integ/chroma.ts
       - integ/truth_chroma.txt
-      - integ/truth_chroma_live.txt
       - integ/check_lines.sh
       - python/mirage/accessor/mongodb.py
       - python/mirage/core/mongodb/**
@@ -19,6 +18,11 @@ name: Integ (databases)
       - python/mirage/core/chroma/**
       - python/mirage/commands/builtin/chroma/**
       - python/mirage/resource/chroma/**
+      - typescript/packages/core/src/accessor/chroma.ts
+      - typescript/packages/core/src/core/chroma/**
+      - typescript/packages/core/src/commands/builtin/chroma/**
+      - typescript/packages/core/src/resource/chroma/**
+      - typescript/packages/core/src/ops/chroma/**
       - .github/workflows/test_integ_databases.yml
   pull_request:
     branches: [main]
@@ -26,9 +30,8 @@ name: Integ (databases)
       - integ/mongodb.py
       - integ/truth_mongodb.txt
       - integ/chroma.py
-      - integ/chroma_live.py
+      - integ/chroma.ts
       - integ/truth_chroma.txt
-      - integ/truth_chroma_live.txt
       - integ/check_lines.sh
       - python/mirage/accessor/mongodb.py
       - python/mirage/core/mongodb/**
@@ -38,6 +41,11 @@ name: Integ (databases)
       - python/mirage/core/chroma/**
       - python/mirage/commands/builtin/chroma/**
       - python/mirage/resource/chroma/**
+      - typescript/packages/core/src/accessor/chroma.ts
+      - typescript/packages/core/src/core/chroma/**
+      - typescript/packages/core/src/commands/builtin/chroma/**
+      - typescript/packages/core/src/resource/chroma/**
+      - typescript/packages/core/src/ops/chroma/**
   workflow_dispatch:
 
 concurrency:
@@ -107,11 +115,6 @@ jobs:
         working-directory: python
         run: uv sync --all-extras --no-extra camel
 
-      - name: Run chroma integ (mock collection) and diff against truth
-        run: |
-          ./python/.venv/bin/python integ/chroma.py > /tmp/chroma.out
-          diff integ/truth_chroma.txt /tmp/chroma.out
-
       - name: Wait for ChromaDB OSS
         run: |
           for i in $(seq 1 30); do
@@ -123,5 +126,52 @@ jobs:
 
       - name: Run chroma integ (ChromaDB OSS) and diff against truth
         run: |
-          ./python/.venv/bin/python integ/chroma_live.py > /tmp/chroma_live.out
-          diff integ/truth_chroma_live.txt /tmp/chroma_live.out
+          ./python/.venv/bin/python integ/chroma.py > /tmp/chroma.out
+          diff integ/truth_chroma.txt /tmp/chroma.out
+
+  integ-chroma-ts:
+    runs-on: ubuntu-latest
+    services:
+      chroma:
+        image: chromadb/chroma:latest
+        ports:
+          - 8000:8000
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.32.1
+
+      - name: Install dependencies
+        working-directory: typescript
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Build mirage-core
+        working-directory: typescript
+        run: pnpm --filter @struktoai/mirage-core build
+
+      - name: Build mirage-node
+        working-directory: typescript
+        run: pnpm --filter @struktoai/mirage-node build
+
+      - name: Wait for ChromaDB OSS
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/api/v2/heartbeat && exit 0
+            sleep 1
+          done
+          echo "ChromaDB did not become healthy" >&2
+          exit 1
+
+      - name: Run TS chroma integ (ChromaDB OSS) and diff against truth
+        working-directory: integ
+        run: |
+          pnpm exec tsx chroma.ts > /tmp/ts-chroma.out
+          diff truth_chroma.txt /tmp/ts-chroma.out

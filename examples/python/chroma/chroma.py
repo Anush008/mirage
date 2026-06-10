@@ -92,7 +92,7 @@ async def main() -> None:
     quoted_query = shlex.quote(query)
     await run(ws, f"grep -in {quoted_query} /knowledge/", max_chars=1500)
     await run(ws,
-              f"search --top-k 5 {quoted_query} /knowledge/",
+              f"chroma-query --top-k 5 {quoted_query} /knowledge/",
               max_chars=1500)
 
     records = ws.ops.records

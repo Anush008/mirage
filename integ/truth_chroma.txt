@@ -45,7 +45,6 @@ Set your token in the ACME_TOKEN environment variable.
 /knowledge/policies/refunds.md:Email support to start a refund with your order id.
 /knowledge/policies/refunds.md:Approved refunds are processed within five business days.
 === grep_rl_encrypted ===
-/knowledge/CHANGELOG.md
 /knowledge/policies/privacy.md
 === grep_v_bearer ===
 /knowledge/guides/auth.md:Requests are rate limited to 100 calls per minute per token.
@@ -88,16 +87,3 @@ Set your token in the ACME_TOKEN environment variable.
 2
 === pipe_sort_uniq_wc ===
 3
-=== search_throttle ===
-/knowledge/guides/auth.md:0.92
-Requests are rate limited to 100 calls per minute per token.
-/knowledge/guides/auth.md:0.88
-If you exceed the limit you receive HTTP 429 and must back off.
-=== search_scoped_refund ===
-/knowledge/policies/refunds.md:0.91
-Refunds are available within 30 days of purchase.
-/knowledge/policies/refunds.md:0.84
-Approved refunds are processed within five business days.
-=== search_encrypted ===
-/knowledge/policies/privacy.md:0.89
-Customer data is stored encrypted at rest and in transit.

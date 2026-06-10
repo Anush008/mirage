@@ -4,6 +4,7 @@ from mirage.cache.index import IndexCacheStore, IndexEntry
 from mirage.core.chroma.path import resolve_path
 from mirage.core.chroma.walk import walk
 from mirage.types import PathSpec
+from mirage.utils.score import score_from_distance
 
 
 async def search_segments(
@@ -115,9 +116,3 @@ def first_result_list(value: object) -> list:
     if value and isinstance(value[0], list):
         return value[0]
     return value
-
-
-def score_from_distance(value: object) -> str:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return "0.00"
-    return f"{max(0.0, 1.0 - float(value)):.2f}"

@@ -22,7 +22,7 @@ def is_mount_root(path: PathSpec) -> bool:
     return value == "/" or value == root
 
 
-@command("search", resource="chroma", spec=SPECS["search"])
+@command("chroma-query", resource="chroma", spec=SPECS["search"])
 async def search(
     accessor,
     paths: list[PathSpec],
