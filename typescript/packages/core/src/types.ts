@@ -141,6 +141,7 @@ export const ResourceName = Object.freeze({
   POSTHOG: 'posthog',
   LANCEDB: 'lancedb',
   CHROMA: 'chroma',
+  DATABRICKS_VOLUME: 'databricks_volume',
 } as const)
 
 export type ResourceName = (typeof ResourceName)[keyof typeof ResourceName]
