@@ -30,10 +30,7 @@ jobs:
       core: ${{ steps.filter.outputs.core }}
       ts: ${{ steps.filter.outputs.ts }}
       database: ${{ steps.filter.outputs.database }}
-      dify: ${{ steps.filter.outputs.dify }}
-      nextcloud: ${{ steps.filter.outputs.nextcloud }}
-      notion: ${{ steps.filter.outputs.notion }}
-      s3: ${{ steps.filter.outputs.s3 }}
+      data: ${{ steps.filter.outputs.data }}
     steps:
       - uses: dorny/paths-filter@v3
         id: filter
@@ -41,6 +38,7 @@ jobs:
           filters: |
             core:
               - 'integ/**'
+              - 'data/**'
               - 'python/**'
               - '.github/workflows/test_integ.yml'
             ts:
@@ -72,32 +70,8 @@ jobs:
               - 'python/mirage/resource/chroma/**'
               - 'typescript/**'
               - '.github/workflows/test_integ.yml'
-            dify:
+            data:
               - 'integ/**'
-              - 'python/**'
-              - '.github/workflows/test_integ.yml'
-            nextcloud:
-              - 'integ/nextcloud.py'
-              - 'integ/truth_nextcloud.txt'
-              - 'integ/check_lines.sh'
-              - 'python/mirage/accessor/nextcloud.py'
-              - 'python/mirage/core/nextcloud/**'
-              - 'python/mirage/commands/builtin/nextcloud/**'
-              - 'python/mirage/resource/nextcloud/**'
-              - '.github/workflows/test_integ.yml'
-            notion:
-              - 'integ/notion.py'
-              - 'integ/notion.ts'
-              - 'integ/truth_notion.txt'
-              - 'python/mirage/accessor/notion.py'
-              - 'python/mirage/core/notion/**'
-              - 'python/mirage/commands/builtin/notion/**'
-              - 'python/mirage/resource/notion/**'
-              - 'typescript/**'
-              - '.github/workflows/test_integ.yml'
-            s3:
-              - 'integ/**'
-              - 'data/**'
               - 'python/**'
               - '.github/workflows/test_integ.yml'
 
@@ -153,6 +127,16 @@ jobs:
         run: |
           ./python/.venv/bin/python integ/safeguard.py > /tmp/safeguard.out
           diff integ/truth_safeguard.txt /tmp/safeguard.out
+
+      - name: Run s3 + gcs + minio integ (moto) and diff against truth
+        run: |
+          ./python/.venv/bin/python integ/s3.py > /tmp/s3.out
+          diff integ/truth_s3.txt /tmp/s3.out
+
+      - name: Run shared command suite on s3 (moto) and diff against shared truth
+        run: |
+          ./python/.venv/bin/python integ/s3_cases.py > /tmp/s3_cases.out
+          diff integ/truth.txt /tmp/s3_cases.out
 
   integ-ts:
     needs: changes
@@ -269,6 +253,12 @@ jobs:
         run: |
           pnpm exec tsx s3.ts > /tmp/ts-s3-native.out
           diff truth_s3_ts.txt /tmp/ts-s3-native.out
+
+      - name: Run notion integ (TS, mock server) and diff against truth
+        working-directory: integ
+        run: |
+          pnpm exec tsx notion.ts > /tmp/notion_ts.out
+          diff truth_notion.txt /tmp/notion_ts.out
 
   integ-database:
     needs: changes
@@ -439,35 +429,9 @@ jobs:
           pnpm exec tsx chroma.ts > /tmp/ts-chroma.out
           diff truth_chroma.txt /tmp/ts-chroma.out
 
-  integ-dify:
+  integ-data:
     needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.dify == 'true') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-
-      - name: Install Python dependencies
-        working-directory: python
-        run: uv sync --all-extras --no-extra camel
-
-      - name: Run dify integ (mock server) and diff against truth
-        run: |
-          ./python/.venv/bin/python integ/dify.py > /tmp/dify.out
-          diff integ/truth_dify.txt /tmp/dify.out
-
-  integ-nextcloud:
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.nextcloud == 'true') }}
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.data == 'true') }}
     runs-on: ubuntu-latest
     services:
       nextcloud:
@@ -500,6 +464,16 @@ jobs:
         working-directory: python
         run: uv sync --all-extras --no-extra camel
 
+      - name: Run dify integ (mock server) and diff against truth
+        run: |
+          ./python/.venv/bin/python integ/dify.py > /tmp/dify.out
+          diff integ/truth_dify.txt /tmp/dify.out
+
+      - name: Run notion integ (mock server) and diff against truth
+        run: |
+          ./python/.venv/bin/python integ/notion.py > /tmp/notion.out
+          diff integ/truth_notion.txt /tmp/notion.out
+
       - name: Wait for Nextcloud install
         shell: bash
         run: |
@@ -521,106 +495,10 @@ jobs:
           ./python/.venv/bin/python integ/nextcloud.py 2>&1 \
             | bash integ/check_lines.sh integ/truth_nextcloud.txt
 
-  integ-notion:
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.notion == 'true') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-
-      - name: Install Python dependencies
-        working-directory: python
-        run: uv sync --all-extras --no-extra camel
-
-      - name: Run notion integ (mock server) and diff against truth
-        run: |
-          ./python/.venv/bin/python integ/notion.py > /tmp/notion.out
-          diff integ/truth_notion.txt /tmp/notion.out
-
-  integ-notion-ts:
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.notion == 'true') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.32.1
-
-      - name: Install dependencies
-        working-directory: typescript
-        run: pnpm install --frozen-lockfile=false
-
-      - name: Build mirage-core
-        working-directory: typescript
-        run: pnpm --filter @struktoai/mirage-core build
-
-      - name: Build mirage-node
-        working-directory: typescript
-        run: pnpm --filter @struktoai/mirage-node build
-
-      - name: Build mirage-browser
-        working-directory: typescript
-        run: pnpm --filter @struktoai/mirage-browser build
-
-      - name: Run notion integ (TS, mock server) and diff against truth
-        working-directory: integ
-        run: |
-          pnpm exec tsx notion.ts > /tmp/notion_ts.out
-          diff truth_notion.txt /tmp/notion_ts.out
-
-  integ-s3:
-    needs: changes
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.s3 == 'true') }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-
-      - name: Install Python dependencies
-        working-directory: python
-        run: uv sync --all-extras --no-extra camel
-
-      - name: Run s3 + gcs + minio integ (moto) and diff against truth
-        run: |
-          ./python/.venv/bin/python integ/s3.py > /tmp/s3.out
-          diff integ/truth_s3.txt /tmp/s3.out
-
-      - name: Run shared command suite on s3 (moto) and diff against shared truth
-        run: |
-          ./python/.venv/bin/python integ/s3_cases.py > /tmp/s3_cases.out
-          diff integ/truth.txt /tmp/s3_cases.out
-
   gate:
     name: integ-gate
     runs-on: ubuntu-latest
-    needs: [changes, integ, integ-ts, integ-database, integ-database-ts, integ-dify, integ-nextcloud, integ-notion, integ-notion-ts, integ-s3]
+    needs: [changes, integ, integ-ts, integ-database, integ-database-ts, integ-data]
     if: always()
     steps:
       - name: Check required jobs
