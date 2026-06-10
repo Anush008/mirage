@@ -21,13 +21,33 @@ async def grep_bytes(
     fixed_string: bool = False,
     only_matching: bool = False,
     max_count: int | None = None,
-    show_filename: bool = True,
 ) -> tuple[bytes, dict[str, bytes]]:
+    """Filename-prefixed grep used by the FUSE ops layer.
+
+    The grep command does not use this; it delegates to the generic
+    grep with the same pushdown (see commands/builtin/chroma/grep.py).
+
+    Args:
+        accessor: Chroma accessor.
+        paths (list[PathSpec]): Files or directories to search.
+        pattern (str): Pattern text.
+        index (IndexCacheStore): Cache index for path resolution.
+        ignore_case (bool): `-i`, case-insensitive matching.
+        invert (bool): `-v`, select non-matching lines.
+        line_numbers (bool): `-n`, prefix line numbers.
+        count_only (bool): `-c`, output match counts.
+        files_only (bool): `-l`, output only matching file paths.
+        whole_word (bool): `-w`, match whole words.
+        fixed_string (bool): `-F`, treat pattern as a literal string.
+        only_matching (bool): `-o`, output only matched text.
+        max_count (int | None): `-m`, stop after this many matches.
+
+    Returns:
+        tuple[bytes, dict[str, bytes]]: Output and per-file reads keyed
+            by mount-relative path.
+    """
     regex = compile_pattern(pattern, ignore_case, fixed_string, whole_word)
     targets = await target_slugs(accessor, paths, index)
-    # Match generic grep: a single explicit file prints bare lines;
-    # multiple targets always carry the filename prefix.
-    prefixed = show_filename or len(targets) > 1
     mount_prefix = paths[0].prefix if paths else ""
     lines: list[str] = []
     reads: dict[str, bytes] = {}
@@ -48,14 +68,11 @@ async def grep_bytes(
                           max_count)
         if count_only:
             if hits:
-                lines.append(f"{path}:{hits[0]}" if prefixed else hits[0])
+                lines.append(f"{path}:{hits[0]}")
         elif files_only:
             lines.extend(hits)
         else:
-            if prefixed:
-                lines.extend(f"{path}:{hit}" for hit in hits)
-            else:
-                lines.extend(hits)
+            lines.extend(f"{path}:{hit}" for hit in hits)
     return "\n".join(lines).encode(), reads
 
 
