@@ -15,7 +15,7 @@
 import type { BoxAccessor } from '../../accessor/box.ts'
 import type { IndexCacheStore } from '../../cache/index/store.ts'
 import type { FindOptions } from '../../resource/base.ts'
-import { PathSpec, type FileStat } from '../../types.ts'
+import { FileType, PathSpec, type FileStat } from '../../types.ts'
 import { rstripSlash } from '../../util/slash.ts'
 import { readdir } from './readdir.ts'
 import { stat } from './stat.ts'
@@ -64,8 +64,14 @@ async function walk(
     return
   }
   for (const child of children) {
-    const isFolder = child.endsWith('/')
-    const trimmed = isFolder ? rstripSlash(child) : child
+    const slashed = child.endsWith('/')
+    const trimmed = slashed ? rstripSlash(child) : child
+    let isFolder = slashed
+    if (!slashed) {
+      // Cached readdir entries carry no trailing slash, so fall back to stat.
+      const s = await statEntry(accessor, trimmed, spec.prefix, index)
+      isFolder = s !== null && s.type === FileType.DIRECTORY
+    }
     out.push({ path: trimmed, depth, file: !isFolder })
     if (isFolder) {
       const childSpec = new PathSpec({

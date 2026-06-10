@@ -79,9 +79,9 @@ async function main(): Promise<void> {
     await show(ws, `uniq ${quote(f1)} | wc -l`)
     await show(ws, `cut -c 1-40 ${quote(f1)} | head -n 3`)
     await show(ws, `sed -n 1,2p ${quote(f1)}`)
-    await show(ws, `grep -c "" ${quote(f1)}`)
-    await show(ws, 'grep -rl "" /dropbox/ | head -n 5', 400)
-    await show(ws, 'rg --files /dropbox/ | head -n 5', 400)
+    await show(ws, `grep -c "." ${quote(f1)}`)
+    await show(ws, 'grep -rl "a" /dropbox/ | head -n 5', 400)
+    await show(ws, 'rg -l "a" /dropbox/ | head -n 5', 400)
     await show(ws, `find /dropbox -type f -name "*.json" -maxdepth 3 | head -n 5`)
     await show(ws, 'du -a /dropbox/ | head -n 8')
 

@@ -83,6 +83,7 @@ describe('box core find', () => {
   beforeEach(() => {
     vi.mocked(readdirMod.readdir).mockReset()
     vi.mocked(statMod.stat).mockReset()
+    mockStats(SIZES)
   })
 
   it('walks recursively returning files and dirs sorted without trailing slashes', async () => {
@@ -129,10 +130,12 @@ describe('box core find', () => {
     expect(out).toEqual(['/docs', '/docs/readme.md', '/notes.txt'])
   })
 
-  it('does not stat when no size or mtime filter is set', async () => {
+  it('does not stat slash-marked directory entries', async () => {
     mockTree(TREE)
     await find(makeAccessor(), ROOT, { name: '*.md' })
-    expect(statMod.stat).not.toHaveBeenCalled()
+    const statted = vi.mocked(statMod.stat).mock.calls.map((c) => c[1].original)
+    expect(statted).not.toContain('/docs')
+    expect(statted).not.toContain('/docs/inner')
   })
 
   it('filters files by minSize letting directories pass', async () => {
@@ -149,12 +152,11 @@ describe('box core find', () => {
     expect(out).toEqual(['/notes.txt'])
   })
 
-  it('stats lazily only entries surviving cheaper filters', async () => {
+  it('stats files for type detection and size filtering only', async () => {
     mockTree(TREE)
-    mockStats(SIZES)
     await find(makeAccessor(), ROOT, { name: '*.md', minSize: 1024 })
-    const statted = vi.mocked(statMod.stat).mock.calls.map((c) => c[1].original)
-    expect(statted.sort()).toEqual(['/docs/inner/deep.md', '/docs/readme.md'])
+    const statted = [...new Set(vi.mocked(statMod.stat).mock.calls.map((c) => c[1].original))]
+    expect(statted.sort()).toEqual(['/docs/inner/deep.md', '/docs/readme.md', '/notes.txt'])
   })
 
   it('filters by mtimeMin and mtimeMax on files and dirs', async () => {
@@ -200,5 +202,17 @@ describe('box core find', () => {
     mockTree(TREE)
     const out = await find(makeAccessor(), ROOT, { nameExclude: '*.md' })
     expect(out).toEqual(['/docs', '/docs/inner', '/notes.txt'])
+  })
+
+  it('detects directories via stat when cached readdir entries lack trailing slashes', async () => {
+    mockTree({
+      '/': ['/docs', '/notes.txt'],
+      '/docs': ['/docs/readme.md'],
+    })
+    mockStats(SIZES)
+    const files = await find(makeAccessor(), ROOT, { type: 'f' })
+    expect(files).toEqual(['/docs/readme.md', '/notes.txt'])
+    const dirs = await find(makeAccessor(), ROOT, { type: 'd' })
+    expect(dirs).toEqual(['/docs'])
   })
 })
