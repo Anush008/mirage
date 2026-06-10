@@ -61,14 +61,14 @@ async function catCommand(
   let io: IOResult
   if (resolved.length === 1 && first !== undefined) {
     const cachable = new CachableAsyncIterator(readStream(accessor, first, index))
-    io = new IOResult({ reads: { [first.original]: cachable }, cache: [first.original] })
+    io = new IOResult({ reads: { [first.stripPrefix]: cachable }, cache: [first.stripPrefix] })
     source = cachable
   } else {
     const reads: Record<string, ByteSource> = {}
     const parts: Uint8Array[] = []
     for (const p of resolved) {
       const data = await readBytes(accessor, p, index)
-      reads[p.original] = data
+      reads[p.stripPrefix] = data
       parts.push(data)
     }
     io = new IOResult({ reads, cache: Object.keys(reads) })

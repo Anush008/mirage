@@ -377,6 +377,17 @@ export const EXIT_CODE_CASES: ReadonlyArray<readonly [string, string]> = [
   ["lazy_exit_grep_match", "grep hello /data/a.txt"],
   ["lazy_exit_grep_no_match", "grep zzz /data/a.txt"],
   ["cp_reject_multi_nondir", "cp /data/a.txt /data/b.txt /data/c.txt"],
+  ["inv_ls_warm", "ls -1 /data/sub"],
+  ["inv_touch", "touch /data/sub/inv_late.txt"],
+  ["inv_rm", "rm /data/sub/inv_late.txt"],
+  ["inv_gone", "cat /data/sub/inv_late.txt"],
+  ["poison_concat", "cat /data/sorted_a.txt /data/sorted_b.txt"],
+  ["poison_first_intact", "cat /data/sorted_a.txt"],
+  ["poison_second_intact", "cat /data/sorted_b.txt"],
+  ["pipe_concat_head_first", "cat /data/sorted_a.txt /data/sorted_b.txt | head -n 2"],
+  ["pipe_concat_head_span", "cat /data/sorted_a.txt /data/sorted_b.txt | head -n 4"],
+  ["pipe_after_first", "cat /data/sorted_a.txt"],
+  ["pipe_after_second", "cat /data/sorted_b.txt"],
 ];
 
 const ENC = new TextEncoder();
