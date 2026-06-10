@@ -5,6 +5,9 @@
     "has_provision": false,
     "has_write": true,
     "resources": [
+      "gdocs",
+      "gsheets",
+      "gslides",
       "opfs",
       "ram",
       "s3"

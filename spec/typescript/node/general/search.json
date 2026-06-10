@@ -2,15 +2,10 @@
   "_meta": {
     "filetypes": [],
     "has_aggregate": false,
-    "has_provision": true,
+    "has_provision": false,
     "has_write": false,
     "resources": [
-      "disk",
-      "gdrive",
-      "ram",
-      "redis",
-      "s3",
-      "ssh"
+      "lancedb"
     ]
   },
   "description": null,
@@ -18,20 +13,31 @@
   "options": [
     {
       "description": null,
-      "long": null,
+      "long": "--method",
       "numeric_shorthand": false,
-      "short": "-t",
+      "short": null,
       "value_kind": "text"
     },
     {
       "description": null,
-      "long": null,
+      "long": "--top-k",
       "numeric_shorthand": false,
-      "short": "-i",
-      "value_kind": "none"
+      "short": null,
+      "value_kind": "text"
+    },
+    {
+      "description": null,
+      "long": "--threshold",
+      "numeric_shorthand": false,
+      "short": null,
+      "value_kind": "text"
     }
   ],
-  "positional": [],
+  "positional": [
+    {
+      "kind": "text"
+    }
+  ],
   "rest": {
     "kind": "path"
   }

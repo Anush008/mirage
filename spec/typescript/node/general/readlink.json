@@ -6,9 +6,11 @@
     "has_write": false,
     "resources": [
       "disk",
+      "gdrive",
       "ram",
       "redis",
-      "s3"
+      "s3",
+      "ssh"
     ]
   },
   "description": null,

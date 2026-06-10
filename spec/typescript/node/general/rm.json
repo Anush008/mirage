@@ -6,6 +6,9 @@
     "has_write": true,
     "resources": [
       "disk",
+      "gdocs",
+      "gsheets",
+      "gslides",
       "ram",
       "redis",
       "s3",

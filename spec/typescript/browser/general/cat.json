@@ -10,6 +10,7 @@
     "has_write": false,
     "resources": [
       "box",
+      "chroma",
       "discord",
       "dropbox",
       "gdocs",
@@ -19,18 +20,16 @@
       "gmail",
       "gsheets",
       "gslides",
+      "lancedb",
       "langfuse",
       "linear",
       "mongodb",
       "notion",
       "opfs",
       "postgres",
-      "posthog",
       "ram",
       "s3",
       "slack",
-      "sscholar-author",
-      "sscholar-paper",
       "trello",
       "vercel"
     ]

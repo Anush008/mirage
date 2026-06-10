@@ -1135,45 +1135,6 @@ export {
 } from './core/vercel/_client.ts'
 export { HttpVercelDriver, type HttpVercelDriverOptions } from './core/vercel/http_driver.ts'
 
-export type {
-  PostHogDriver,
-  PostHogPaged,
-  PostHogProject,
-  PostHogUser,
-} from './core/posthog/_driver.ts'
-export { PostHogAccessor } from './accessor/posthog.ts'
-export {
-  normalizePostHogConfig,
-  resolvePostHogConfig,
-  type PostHogConfig,
-  type PostHogConfigResolved,
-} from './resource/posthog/config.ts'
-export { POSTHOG_PROMPT } from './resource/posthog/prompt.ts'
-export { POSTHOG_OPS } from './ops/posthog/index.ts'
-export { POSTHOG_COMMANDS } from './commands/builtin/posthog/index.ts'
-export { read as posthogRead } from './core/posthog/read.ts'
-export { readdir as posthogReaddir } from './core/posthog/readdir.ts'
-export { stat as posthogStat } from './core/posthog/stat.ts'
-export { resolveGlob as resolvePostHogGlob } from './core/posthog/glob.ts'
-export {
-  detectScope as detectPostHogScope,
-  type PostHogScope,
-  type PostHogLevel,
-  ROOT_ENTRIES as POSTHOG_ROOT_ENTRIES,
-  PROJECT_FILES as POSTHOG_PROJECT_FILES,
-} from './core/posthog/scope.ts'
-export {
-  getUser as posthogGetUser,
-  getProject as posthogGetProject,
-  listProjects as posthogListProjects,
-  listFeatureFlags as posthogListFeatureFlags,
-  listCohorts as posthogListCohorts,
-  listDashboards as posthogListDashboards,
-  listInsights as posthogListInsights,
-  listPersons as posthogListPersons,
-} from './core/posthog/_client.ts'
-export { HttpPostHogDriver, type HttpPostHogDriverOptions } from './core/posthog/http_driver.ts'
-
 export { setHttpProxyBase } from './commands/builtin/utils/http.ts'
 
 export { lstripSlash, rstripSlash, stripSlash } from './util/slash.ts'

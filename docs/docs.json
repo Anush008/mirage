@@ -452,7 +452,6 @@
                 "icon": "ellipsis",
                 "pages": [
                   "typescript/setup/trello",
-                  "typescript/setup/posthog",
                   "typescript/setup/vercel"
                 ]
               }

@@ -6,6 +6,7 @@
     "has_write": false,
     "resources": [
       "box",
+      "chroma",
       "discord",
       "dropbox",
       "gdocs",
@@ -15,6 +16,7 @@
       "gmail",
       "gsheets",
       "gslides",
+      "lancedb",
       "langfuse",
       "linear",
       "mongodb",
