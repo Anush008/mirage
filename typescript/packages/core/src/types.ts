@@ -144,6 +144,15 @@ export const ResourceName = Object.freeze({
   HF_MODELS: 'hf_models',
   HF_SPACES: 'hf_spaces',
   DATABRICKS_VOLUME: 'databricks_volume',
+  MINIO: 'minio',
+  CEPH: 'ceph',
+  WASABI: 'wasabi',
+  BACKBLAZE: 'backblaze',
+  DIGITALOCEAN: 'digitalocean',
+  TENCENT: 'tencent',
+  ALIYUN: 'aliyun',
+  SCALEWAY: 'scaleway',
+  QINGSTOR: 'qingstor',
 } as const)
 
 export type ResourceName = (typeof ResourceName)[keyof typeof ResourceName]

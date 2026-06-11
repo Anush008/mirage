@@ -94,6 +94,51 @@ const REGISTRY: Record<string, ResourceFactory> = {
     const { normalizeDatabricksVolumeConfig } = await import('@struktoai/mirage-core')
     return DatabricksVolumeResource.create(normalizeDatabricksVolumeConfig(config))
   },
+  minio: async (config) => {
+    const { MinIOResource } = await import('./minio/minio.ts')
+    const { normalizeMinIOConfig } = await import('./minio/config.ts')
+    return new MinIOResource(normalizeMinIOConfig(config))
+  },
+  ceph: async (config) => {
+    const { CephResource } = await import('./ceph/ceph.ts')
+    const { normalizeCephConfig } = await import('./ceph/config.ts')
+    return new CephResource(normalizeCephConfig(config))
+  },
+  wasabi: async (config) => {
+    const { WasabiResource } = await import('./wasabi/wasabi.ts')
+    const { normalizeWasabiConfig } = await import('./wasabi/config.ts')
+    return new WasabiResource(normalizeWasabiConfig(config))
+  },
+  backblaze: async (config) => {
+    const { BackblazeResource } = await import('./backblaze/backblaze.ts')
+    const { normalizeBackblazeConfig } = await import('./backblaze/config.ts')
+    return new BackblazeResource(normalizeBackblazeConfig(config))
+  },
+  digitalocean: async (config) => {
+    const { DigitalOceanResource } = await import('./digitalocean/digitalocean.ts')
+    const { normalizeDigitalOceanConfig } = await import('./digitalocean/config.ts')
+    return new DigitalOceanResource(normalizeDigitalOceanConfig(config))
+  },
+  tencent: async (config) => {
+    const { TencentResource } = await import('./tencent/tencent.ts')
+    const { normalizeTencentConfig } = await import('./tencent/config.ts')
+    return new TencentResource(normalizeTencentConfig(config))
+  },
+  aliyun: async (config) => {
+    const { AliyunResource } = await import('./aliyun/aliyun.ts')
+    const { normalizeAliyunConfig } = await import('./aliyun/config.ts')
+    return new AliyunResource(normalizeAliyunConfig(config))
+  },
+  scaleway: async (config) => {
+    const { ScalewayResource } = await import('./scaleway/scaleway.ts')
+    const { normalizeScalewayConfig } = await import('./scaleway/config.ts')
+    return new ScalewayResource(normalizeScalewayConfig(config))
+  },
+  qingstor: async (config) => {
+    const { QingStorResource } = await import('./qingstor/qingstor.ts')
+    const { normalizeQingStorConfig } = await import('./qingstor/config.ts')
+    return new QingStorResource(normalizeQingStorConfig(config))
+  },
   postgres: async (config) => {
     const { PostgresResource } = await import('./postgres/postgres.ts')
     const { normalizePostgresConfig } = await import('@struktoai/mirage-core')
