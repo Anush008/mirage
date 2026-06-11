@@ -16,7 +16,7 @@
       },
       "expect": {
         "exit": 0,
-        "stdout_text": "a.txt 24\n",
+        "stdout_text": "/data/a.txt 24\n",
         "stderr_text": ""
       }
     }
