@@ -130,6 +130,79 @@ export { HfSpacesResource, type HfSpacesResourceState } from './resource/hf_spac
 export { HF_SPACES_PROMPT } from './resource/hf_spaces/prompt.ts'
 export { HF_COMMANDS } from './commands/builtin/hf/index.ts'
 export { HF_OPS } from './ops/hf/index.ts'
+export { MinIOResource, type MinIOResourceState } from './resource/minio/minio.ts'
+export {
+  redactMinIOConfig,
+  type MinIOConfig,
+  type MinIOConfigRedacted,
+} from './resource/minio/config.ts'
+export { MINIO_PROMPT } from './resource/minio/prompt.ts'
+export { CephResource, type CephResourceState } from './resource/ceph/ceph.ts'
+export {
+  redactCephConfig,
+  type CephConfig,
+  type CephConfigRedacted,
+} from './resource/ceph/config.ts'
+export { CEPH_PROMPT } from './resource/ceph/prompt.ts'
+export { WasabiResource, type WasabiResourceState } from './resource/wasabi/wasabi.ts'
+export {
+  redactWasabiConfig,
+  resolvedWasabiEndpoint,
+  type WasabiConfig,
+  type WasabiConfigRedacted,
+} from './resource/wasabi/config.ts'
+export { WASABI_PROMPT } from './resource/wasabi/prompt.ts'
+export { BackblazeResource, type BackblazeResourceState } from './resource/backblaze/backblaze.ts'
+export {
+  redactBackblazeConfig,
+  resolvedBackblazeEndpoint,
+  type BackblazeConfig,
+  type BackblazeConfigRedacted,
+} from './resource/backblaze/config.ts'
+export { BACKBLAZE_PROMPT } from './resource/backblaze/prompt.ts'
+export {
+  DigitalOceanResource,
+  type DigitalOceanResourceState,
+} from './resource/digitalocean/digitalocean.ts'
+export {
+  redactDigitalOceanConfig,
+  resolvedDigitalOceanEndpoint,
+  type DigitalOceanConfig,
+  type DigitalOceanConfigRedacted,
+} from './resource/digitalocean/config.ts'
+export { DIGITALOCEAN_PROMPT } from './resource/digitalocean/prompt.ts'
+export { TencentResource, type TencentResourceState } from './resource/tencent/tencent.ts'
+export {
+  redactTencentConfig,
+  resolvedTencentEndpoint,
+  type TencentConfig,
+  type TencentConfigRedacted,
+} from './resource/tencent/config.ts'
+export { TENCENT_PROMPT } from './resource/tencent/prompt.ts'
+export { AliyunResource, type AliyunResourceState } from './resource/aliyun/aliyun.ts'
+export {
+  redactAliyunConfig,
+  resolvedAliyunEndpoint,
+  type AliyunConfig,
+  type AliyunConfigRedacted,
+} from './resource/aliyun/config.ts'
+export { ALIYUN_PROMPT } from './resource/aliyun/prompt.ts'
+export { ScalewayResource, type ScalewayResourceState } from './resource/scaleway/scaleway.ts'
+export {
+  redactScalewayConfig,
+  resolvedScalewayEndpoint,
+  type ScalewayConfig,
+  type ScalewayConfigRedacted,
+} from './resource/scaleway/config.ts'
+export { SCALEWAY_PROMPT } from './resource/scaleway/prompt.ts'
+export { QingStorResource, type QingStorResourceState } from './resource/qingstor/qingstor.ts'
+export {
+  redactQingStorConfig,
+  resolvedQingStorEndpoint,
+  type QingStorConfig,
+  type QingStorConfigRedacted,
+} from './resource/qingstor/config.ts'
+export { QINGSTOR_PROMPT } from './resource/qingstor/prompt.ts'
 export { PostgresResource, type PostgresResourceOptions } from './resource/postgres/postgres.ts'
 export { PostgresStore } from './resource/postgres/store.ts'
 export { MongoDBResource, type MongoDBResourceOptions } from './resource/mongodb/mongodb.ts'

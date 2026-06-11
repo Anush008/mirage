@@ -558,6 +558,7 @@ export {
   type S3Config,
   type S3ConfigRedacted,
 } from './resource/s3/config.ts'
+export { remapCommandsResource, remapOpsResource } from './resource/s3/remap.ts'
 export { S3_PROMPT } from './resource/s3/prompt.ts'
 export { SCOPE_ERROR as S3_SCOPE_ERROR } from './core/s3/constants.ts'
 export { S3IndexEntry, type S3IndexEntryInit, type S3Object } from './core/s3/entry.ts'
@@ -1068,7 +1069,6 @@ export { readBytes as chromaRead, readStream as chromaReadStream } from './core/
 export { readdir as chromaReaddir } from './core/chroma/readdir.ts'
 export { stat as chromaStat } from './core/chroma/stat.ts'
 export { resolveGlob as resolveChromaGlob } from './core/chroma/glob.ts'
-export { grepBytes as chromaGrep } from './core/chroma/grep.ts'
 export { searchSegments as chromaSearch } from './core/chroma/search.ts'
 export { scoreFromDistance } from './util/score.ts'
 export {
