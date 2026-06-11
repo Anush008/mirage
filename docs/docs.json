@@ -390,7 +390,16 @@
                   "typescript/setup/r2",
                   "typescript/setup/gcs",
                   "typescript/setup/oci",
-                  "typescript/setup/supabase"
+                  "typescript/setup/supabase",
+                  "typescript/setup/minio",
+                  "typescript/setup/ceph",
+                  "typescript/setup/wasabi",
+                  "typescript/setup/backblaze",
+                  "typescript/setup/digitalocean",
+                  "typescript/setup/tencent",
+                  "typescript/setup/aliyun",
+                  "typescript/setup/scaleway",
+                  "typescript/setup/qingstor"
                 ]
               },
               {
