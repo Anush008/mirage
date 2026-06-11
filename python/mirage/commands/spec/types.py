@@ -29,6 +29,7 @@ class Option:
     long: str | None = None
     value_kind: OperandKind = OperandKind.NONE
     numeric_shorthand: bool = False
+    repeatable: bool = False
     description: str | None = None
 
 

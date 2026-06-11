@@ -281,6 +281,9 @@ export const CASES: ReadonlyArray<readonly [string, string]> = [
   ["grep_e_flag", "grep -e world /data/a.txt"],
   ["grep_e_n", "grep -n -e bar /data/a.txt"],
   ["grep_e_multi_file", "grep -e hello /data/mixed.txt /data/a.txt"],
+  ["grep_e_multi_pattern", "grep -e world -e bar /data/a.txt"],
+  ["grep_e_multi_pattern_n", "grep -n -e hello -e baz /data/a.txt"],
+  ["grep_e_multi_pattern_F", "grep -F -e a.b -e foo /data/a.txt"],
 
   ["paste_s", "paste -s /data/b.txt"],
   ["paste_d_comma", "paste -d , /data/a.txt /data/b.txt"],

@@ -878,6 +878,14 @@ world
 === grep_e_multi_file ===
 /data/mixed.txt:hello WORLD
 /data/a.txt:hello
+=== grep_e_multi_pattern ===
+world
+bar
+=== grep_e_multi_pattern_n ===
+1:hello
+5:baz
+=== grep_e_multi_pattern_F ===
+foo
 === paste_s ===
 1	2	3
 === paste_d_comma ===

@@ -2,18 +2,11 @@ import gzip as gziplib
 import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 
+from mirage.commands.builtin.grep_helper import build_pattern_str
 from mirage.commands.builtin.utils.lines import split_lines
 from mirage.commands.builtin.utils.stream import _read_stdin_async
 from mirage.io.types import ByteSource, IOResult
 from mirage.types import PathSpec
-
-
-def _build_pattern(pattern: str, fixed: bool, whole_word: bool) -> str:
-    if fixed:
-        pattern = re.escape(pattern)
-    if whole_word:
-        pattern = r"\b" + pattern + r"\b"
-    return pattern
 
 
 def _zgrep_search(
@@ -96,7 +89,7 @@ async def zgrep(
     quiet: bool = False,
     whole_word: bool = False,
 ) -> tuple[ByteSource | None, IOResult]:
-    compiled = _build_pattern(pattern, fixed, whole_word)
+    compiled = build_pattern_str(pattern, fixed, whole_word)
     multi = len(paths) > 1
     show_filename = force_filename or (multi and not suppress_filename)
     any_match = False

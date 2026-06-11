@@ -31,18 +31,33 @@ export function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+export function buildPatternStr(pattern: string, fixedString = false, wholeWord = false): string {
+  const parts = pattern.split('\n')
+  if (parts.length === 1) {
+    let patStr = fixedString ? escapeRegex(pattern) : pattern
+    if (wholeWord) patStr = `\\b${patStr}\\b`
+    return patStr
+  }
+  const subs: string[] = []
+  for (const part of parts) {
+    let sub = fixedString ? escapeRegex(part) : `(?:${part})`
+    if (wholeWord) sub = `\\b${sub}\\b`
+    subs.push(sub)
+  }
+  return subs.join('|')
+}
+
 export function compilePattern(
   pattern: string,
   ignoreCase = false,
   fixedString = false,
   wholeWord = false,
 ): RegExp {
-  let patStr = fixedString ? escapeRegex(pattern) : pattern
-  if (wholeWord) patStr = `\\b${patStr}\\b`
-  return new RegExp(patStr, ignoreCase ? 'i' : '')
+  return new RegExp(buildPatternStr(pattern, fixedString, wholeWord), ignoreCase ? 'i' : '')
 }
 
 export function isRegexPattern(pattern: string, fixedString: boolean): boolean {
+  if (pattern.includes('\n')) return true
   if (fixedString) return false
   return !/^[\w\s\-.]+$/.test(pattern)
 }

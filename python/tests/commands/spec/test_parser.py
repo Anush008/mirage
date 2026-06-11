@@ -52,6 +52,26 @@ def test_zgrep_dash_e_frees_positional_slot_for_path():
     assert parsed.paths() == ["/data/a.gz"]
 
 
+def test_grep_repeated_dash_e_accumulates_newline_joined():
+    parsed = parse_command(SPECS["grep"], ["-e", "foo", "-e", "bar", "/a.txt"],
+                           "/")
+    assert parsed.flags["-e"] == "foo\nbar"
+    assert parsed.texts() == []
+    assert parsed.paths() == ["/a.txt"]
+
+
+def test_grep_repeated_dash_e_attached_value_accumulates():
+    parsed = parse_command(SPECS["grep"], ["-e", "foo", "-ebar", "/a.txt"],
+                           "/")
+    assert parsed.flags["-e"] == "foo\nbar"
+    assert parsed.paths() == ["/a.txt"]
+
+
+def test_non_repeatable_value_flag_keeps_last_value():
+    parsed = parse_command(SPECS["grep"], ["-m", "1", "-m", "2", "pat"], "/")
+    assert parsed.flags["-m"] == "2"
+
+
 def test_provided_by_only_skips_slot_when_flag_present():
     spec = CommandSpec(
         options=(Option(short="-e", value_kind=OperandKind.TEXT), ),

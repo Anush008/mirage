@@ -27,6 +27,19 @@ def _resolve(cwd: str, path: str) -> str:
     return posixpath.normpath(posixpath.join(cwd, path))
 
 
+def _set_value_flag(
+    flags: dict[str, str | bool],
+    name: str,
+    value: str,
+    repeat_flags: set[str],
+) -> None:
+    prev = flags.get(name)
+    if name in repeat_flags and isinstance(prev, str):
+        flags[name] = f"{prev}\n{value}"
+    else:
+        flags[name] = value
+
+
 def parse_command(
     spec: CommandSpec,
     argv: list[str],
@@ -37,6 +50,7 @@ def parse_command(
     long_bool_flags: set[str] = set()
     long_value_flags: set[str] = set()
     value_flag_kinds: dict[str, OperandKind] = {}
+    repeat_flags: set[str] = set()
     numeric_shorthand_flag: str | None = None
     for opt in spec.options:
         if opt.short:
@@ -46,6 +60,8 @@ def parse_command(
                 value_flags.add(opt.short)
                 if opt.value_kind == OperandKind.PATH:
                     value_flag_kinds[opt.short] = OperandKind.PATH
+                if opt.repeatable:
+                    repeat_flags.add(opt.short)
                 if opt.numeric_shorthand:
                     numeric_shorthand_flag = opt.short
         if opt.long:
@@ -55,6 +71,8 @@ def parse_command(
                 long_value_flags.add(opt.long)
                 if opt.value_kind == OperandKind.PATH:
                     value_flag_kinds[opt.long] = OperandKind.PATH
+                if opt.repeatable:
+                    repeat_flags.add(opt.long)
 
     rest_kind: OperandKind | None = (spec.rest.kind
                                      if spec.rest is not None else None)
@@ -95,7 +113,7 @@ def parse_command(
                 flags[tok] = True
                 i += 1
             elif tok in long_value_flags and i + 1 < len(filtered_argv):
-                flags[tok] = filtered_argv[i + 1]
+                _set_value_flag(flags, tok, filtered_argv[i + 1], repeat_flags)
                 i += 2
             else:
                 raw_args.append(tok)
@@ -111,12 +129,13 @@ def parse_command(
             matched_value = False
             for vf in value_flags:
                 if tok == vf and i + 1 < len(filtered_argv):
-                    flags[vf] = filtered_argv[i + 1]
+                    _set_value_flag(flags, vf, filtered_argv[i + 1],
+                                    repeat_flags)
                     i += 2
                     matched_value = True
                     break
                 if tok.startswith(vf) and len(tok) > len(vf):
-                    flags[vf] = tok[len(vf):]
+                    _set_value_flag(flags, vf, tok[len(vf):], repeat_flags)
                     i += 1
                     matched_value = True
                     break

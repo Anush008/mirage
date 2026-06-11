@@ -22,12 +22,27 @@ export function resolvePath(cwd: string, path: string): string {
   return posixNormpath(`${rstripSlash(cwd)}/${path}`)
 }
 
+function setValueFlag(
+  flags: Record<string, string | boolean>,
+  name: string,
+  value: string,
+  repeatFlags: ReadonlySet<string>,
+): void {
+  const prev = flags[name]
+  if (repeatFlags.has(name) && typeof prev === 'string') {
+    flags[name] = `${prev}\n${value}`
+  } else {
+    flags[name] = value
+  }
+}
+
 export function parseCommand(spec: CommandSpec, argv: string[], cwd: string): ParsedArgs {
   const boolFlags = new Set<string>()
   const valueFlags = new Set<string>()
   const longBoolFlags = new Set<string>()
   const longValueFlags = new Set<string>()
   const valueFlagKinds = new Map<string, OperandKind>()
+  const repeatFlags = new Set<string>()
   let numericShorthandFlag: string | null = null
 
   for (const opt of spec.options) {
@@ -39,6 +54,7 @@ export function parseCommand(spec: CommandSpec, argv: string[], cwd: string): Pa
         if (opt.valueKind === OperandKind.PATH) {
           valueFlagKinds.set(opt.short, OperandKind.PATH)
         }
+        if (opt.repeatable) repeatFlags.add(opt.short)
         if (opt.numericShorthand) numericShorthandFlag = opt.short
       }
     }
@@ -50,6 +66,7 @@ export function parseCommand(spec: CommandSpec, argv: string[], cwd: string): Pa
         if (opt.valueKind === OperandKind.PATH) {
           valueFlagKinds.set(opt.long, OperandKind.PATH)
         }
+        if (opt.repeatable) repeatFlags.add(opt.long)
       }
     }
   }
@@ -101,7 +118,7 @@ export function parseCommand(spec: CommandSpec, argv: string[], cwd: string): Pa
         flags[tok] = true
         i += 1
       } else if (longValueFlags.has(tok) && i + 1 < filteredArgv.length) {
-        flags[tok] = filteredArgv[i + 1] ?? ''
+        setValueFlag(flags, tok, filteredArgv[i + 1] ?? '', repeatFlags)
         i += 2
       } else {
         rawArgs.push(tok)
@@ -119,13 +136,13 @@ export function parseCommand(spec: CommandSpec, argv: string[], cwd: string): Pa
       let matchedValue = false
       for (const vf of valueFlags) {
         if (tok === vf && i + 1 < filteredArgv.length) {
-          flags[vf] = filteredArgv[i + 1] ?? ''
+          setValueFlag(flags, vf, filteredArgv[i + 1] ?? '', repeatFlags)
           i += 2
           matchedValue = true
           break
         }
         if (tok.startsWith(vf) && tok.length > vf.length) {
-          flags[vf] = tok.slice(vf.length)
+          setValueFlag(flags, vf, tok.slice(vf.length), repeatFlags)
           i += 1
           matchedValue = true
           break

@@ -25,6 +25,7 @@ export interface OptionInit {
   long?: string | null
   valueKind?: OperandKind
   numericShorthand?: boolean
+  repeatable?: boolean
   description?: string
 }
 
@@ -33,6 +34,7 @@ export class Option {
   readonly long: string | null
   readonly valueKind: OperandKind
   readonly numericShorthand: boolean
+  readonly repeatable: boolean
   readonly description: string | null
 
   constructor(init: OptionInit = {}) {
@@ -40,6 +42,7 @@ export class Option {
     this.long = init.long ?? null
     this.valueKind = init.valueKind ?? OperandKind.NONE
     this.numericShorthand = init.numericShorthand ?? false
+    this.repeatable = init.repeatable ?? false
     this.description = init.description ?? null
     Object.freeze(this)
   }

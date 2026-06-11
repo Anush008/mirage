@@ -261,6 +261,27 @@ describe('parseCommand — providedBy frees the positional slot', () => {
   })
 })
 
+describe('parseCommand — repeatable value flags accumulate newline-joined', () => {
+  // POSIX: each -e adds a pattern; a pattern argument is itself a
+  // newline-separated pattern list, so repeats join with \n.
+  it('accumulates repeated -e for grep', () => {
+    const p = parseCommand(specOf('grep'), ['-e', 'foo', '-e', 'bar', '/a.txt'], '/')
+    expect(p.flags['-e']).toBe('foo\nbar')
+    expect(p.texts()).toEqual([])
+    expect(p.paths()).toEqual(['/a.txt'])
+  })
+
+  it('accumulates attached-value repeats', () => {
+    const p = parseCommand(specOf('grep'), ['-e', 'foo', '-ebar', '/a.txt'], '/')
+    expect(p.flags['-e']).toBe('foo\nbar')
+  })
+
+  it('non-repeatable value flags keep the last value', () => {
+    const p = parseCommand(specOf('grep'), ['-m', '1', '-m', '2', 'pat'], '/')
+    expect(p.flags['-m']).toBe('2')
+  })
+})
+
 describe('parseToKwargs', () => {
   it('strips leading dashes and converts kebab to snake', () => {
     const parsed = new ParsedArgs({

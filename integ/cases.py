@@ -343,6 +343,9 @@ CASES: list[tuple[str, str]] = [
     ("grep_e_flag", "grep -e world /data/a.txt"),
     ("grep_e_n", "grep -n -e bar /data/a.txt"),
     ("grep_e_multi_file", "grep -e hello /data/mixed.txt /data/a.txt"),
+    ("grep_e_multi_pattern", "grep -e world -e bar /data/a.txt"),
+    ("grep_e_multi_pattern_n", "grep -n -e hello -e baz /data/a.txt"),
+    ("grep_e_multi_pattern_F", "grep -F -e a.b -e foo /data/a.txt"),
 
     # ----- paste advanced -----
     ("paste_s", "paste -s /data/b.txt"),

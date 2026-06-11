@@ -42,3 +42,15 @@ async def test_grep_dash_e_matches_like_positional_pattern(workspace):
                                  session_id="default")
     assert io.exit_code == 0
     assert (io.stdout or b"").decode() == "orange line\n"
+
+
+@pytest.mark.asyncio
+async def test_grep_repeated_dash_e_matches_any_pattern(workspace):
+    await workspace.ops.mkdir("/data")
+    await workspace.ops.write("/data/a.txt",
+                              b"orange line\nplain line\nlast line\n")
+
+    io = await workspace.execute("grep -e orange -e plain /data/a.txt",
+                                 session_id="default")
+    assert io.exit_code == 0
+    assert (io.stdout or b"").decode() == "orange line\nplain line\n"

@@ -52,4 +52,12 @@ describe('grep -e pattern flag', () => {
     expect(stdoutStr(io)).toBe('orange line\n')
     await ws.close()
   })
+
+  it('repeated -e matches lines hitting any pattern', async () => {
+    const ws = await makeWs()
+    const io = await ws.execute('grep -e orange -e plain /data/a.txt')
+    expect(io.exitCode).toBe(0)
+    expect(stdoutStr(io)).toBe('orange line\nplain line\n')
+    await ws.close()
+  })
 })

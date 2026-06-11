@@ -47,11 +47,44 @@ def classify_pattern(
     Returns:
         PatternType: EXACT, SIMPLE, or REGEX.
     """
+    if "\n" in pattern:
+        return PatternType.REGEX
     if fixed_string:
         return PatternType.EXACT
     if re.fullmatch(r'[\w\s\-_.]+', pattern):
         return PatternType.SIMPLE
     return PatternType.REGEX
+
+
+def build_pattern_str(
+    pattern: str,
+    fixed_string: bool = False,
+    whole_word: bool = False,
+) -> str:
+    """Build a regex source string from a POSIX pattern list.
+
+    Args:
+        pattern (str): newline-separated pattern list; a line matches when
+            any of the patterns matches.
+        fixed_string (bool): True if -F flag is set.
+        whole_word (bool): True if -w flag is set.
+
+    Returns:
+        str: regex source string.
+    """
+    parts = pattern.split("\n")
+    if len(parts) == 1:
+        pat_str = re.escape(pattern) if fixed_string else pattern
+        if whole_word:
+            pat_str = r"\b" + pat_str + r"\b"
+        return pat_str
+    subs: list[str] = []
+    for part in parts:
+        sub = re.escape(part) if fixed_string else f"(?:{part})"
+        if whole_word:
+            sub = r"\b" + sub + r"\b"
+        subs.append(sub)
+    return "|".join(subs)
 
 
 def compile_pattern(
@@ -61,10 +94,8 @@ def compile_pattern(
     whole_word: bool = False,
 ) -> re.Pattern[str]:
     flags = re.IGNORECASE if ignore_case else 0
-    pat_str = re.escape(pattern) if fixed_string else pattern
-    if whole_word:
-        pat_str = r"\b" + pat_str + r"\b"
-    return re.compile(pat_str, flags)
+    return re.compile(build_pattern_str(pattern, fixed_string, whole_word),
+                      flags)
 
 
 def get_extension(path: str) -> str | None:
