@@ -21,21 +21,30 @@ from dotenv import load_dotenv
 from mirage import MountMode, Workspace
 from mirage.agents.langchain import (LangchainWorkspace, build_system_prompt,
                                      extract_text)
-from mirage.resource.databricks_volume import (DatabricksVolumeConfig,
-                                               DatabricksVolumeResource)
+from mirage.resource.databricks_volume import (DatabricksProfileTokenProvider,
+                                               DatabricksVolumeConfig,
+                                               DatabricksVolumeResource,
+                                               StaticTokenProvider)
 
 load_dotenv(".env.development")
 
+host = os.environ["DATABRICKS_HOST"]
+token = os.environ.get("DATABRICKS_TOKEN")
+token_provider = (StaticTokenProvider(token)
+                  if token else DatabricksProfileTokenProvider(
+                      host,
+                      os.environ.get("DATABRICKS_CONFIG_PROFILE", "DEFAULT"),
+                  ))
 resource = DatabricksVolumeResource(
     DatabricksVolumeConfig(
+        host=host,
         catalog=os.environ["DATABRICKS_VOLUME_CATALOG"],
         schema=os.environ["DATABRICKS_VOLUME_SCHEMA"],
         volume=os.environ["DATABRICKS_VOLUME_NAME"],
         root_path=os.environ.get("DATABRICKS_VOLUME_ROOT_PATH", "/"),
-        host=os.environ.get("DATABRICKS_HOST"),
-        token=os.environ.get("DATABRICKS_TOKEN"),
-        profile=os.environ.get("DATABRICKS_CONFIG_PROFILE"),
-    ))
+    ),
+    token_provider=token_provider,
+)
 
 ws = Workspace({"/dbx/": resource}, mode=MountMode.READ)
 

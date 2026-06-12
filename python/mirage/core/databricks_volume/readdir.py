@@ -12,7 +12,6 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import asyncio
 import logging
 
 from mirage.accessor.databricks_volume import DatabricksVolumeAccessor
@@ -23,13 +22,6 @@ from mirage.types import PathSpec
 
 logger = logging.getLogger(__name__)
 SCOPE_ERROR = 10_000
-
-
-def _list_directory_sync(
-    accessor: DatabricksVolumeAccessor,
-    remote_path: str,
-) -> list[object]:
-    return list(accessor.files.list_directory_contents(remote_path))
 
 
 async def readdir(
@@ -46,11 +38,7 @@ async def readdir(
         return listing.entries
     remote_path = backend_path(accessor.config, list_path)
     try:
-        entries = await asyncio.to_thread(
-            _list_directory_sync,
-            accessor,
-            remote_path,
-        )
+        entries = await accessor.client.list_directory(remote_path)
     except Exception as exc:
         if is_not_found(exc):
             raise FileNotFoundError(list_path.strip_prefix) from exc

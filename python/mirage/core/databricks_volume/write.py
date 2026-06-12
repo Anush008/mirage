@@ -12,9 +12,7 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import asyncio
 import time
-from io import BytesIO
 
 from mirage.accessor.databricks_volume import DatabricksVolumeAccessor
 from mirage.cache.index import IndexCacheStore
@@ -36,34 +34,26 @@ def _is_directory_metadata(metadata: object) -> bool:
     return str(object_type).lower().endswith("directory")
 
 
-def _ensure_parent_directory_sync(
+async def _ensure_parent_directory(
     accessor: DatabricksVolumeAccessor,
     remote_parent: str,
     virtual_target: str,
 ) -> None:
     try:
-        accessor.files.get_directory_metadata(remote_parent)
+        await accessor.client.get_directory_metadata(remote_parent)
         return
     except Exception as exc:
         if not is_not_found(exc):
             raise
         not_found = exc
     try:
-        metadata = accessor.files.get_metadata(remote_parent)
+        metadata = await accessor.client.get_metadata(remote_parent)
     except Exception as exc:
         if is_not_found(exc):
             raise FileNotFoundError(virtual_target) from not_found
         raise
     if not _is_directory_metadata(metadata):
         raise NotADirectoryError(virtual_target)
-
-
-def _upload_bytes_sync(
-    accessor: DatabricksVolumeAccessor,
-    remote_path: str,
-    data: bytes,
-) -> None:
-    accessor.files.upload(remote_path, BytesIO(data), overwrite=True)
 
 
 async def write_bytes(
@@ -77,16 +67,13 @@ async def write_bytes(
     remote_parent = backend_path(accessor.config, parent)
     remote_path = backend_path(accessor.config, path)
     start_ms = int(time.monotonic() * 1000)
-    # TODO native async client calling HTTP API as databricks sdk is sync
-    await asyncio.to_thread(
-        _ensure_parent_directory_sync,
+    await _ensure_parent_directory(
         accessor,
         remote_parent,
         path.strip_prefix,
     )
     try:
-        await asyncio.to_thread(_upload_bytes_sync, accessor, remote_path,
-                                data)
+        await accessor.client.upload(remote_path, data)
     except Exception as exc:
         if is_not_found(exc):
             raise FileNotFoundError(path.strip_prefix) from exc

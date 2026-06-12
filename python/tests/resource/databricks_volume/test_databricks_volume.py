@@ -15,7 +15,6 @@
 import posixpath
 from io import BytesIO
 from types import SimpleNamespace
-from urllib.parse import unquote
 
 import pytest
 from pydantic import ValidationError
@@ -24,7 +23,8 @@ from mirage import MountMode, Workspace
 from mirage.cache.index import IndexEntry, LookupStatus
 from mirage.core.databricks_volume.path import backend_path
 from mirage.resource.databricks_volume import (DatabricksVolumeConfig,
-                                               DatabricksVolumeResource)
+                                               DatabricksVolumeResource,
+                                               StaticTokenProvider)
 from mirage.types import PathSpec, ResourceName
 
 
@@ -155,58 +155,69 @@ def _apply_range_header(data: bytes, range_header: str) -> bytes:
     return data[start:end]
 
 
-class FakeApiClient:
+class FakeDatabricksFilesClient:
 
     def __init__(self, files: FakeFiles) -> None:
         self.files = files
 
-    def do(
+    async def read_bytes(
         self,
-        method: str,
-        path: str | None = None,
-        url: str | None = None,
-        query: dict | None = None,
-        headers: dict | None = None,
-        body: dict | None = None,
-        raw: bool = False,
-        files: object = None,
-        data: object = None,
-        auth: object = None,
-        response_headers: list[str] | None = None,
-    ) -> dict:
-        if method != "GET" or path is None:
-            raise ValueError(f"unsupported fake API call: {method} {path}")
-        remote_path = unquote(path.removeprefix("/api/2.0/fs/files"))
-        if remote_path not in self.files.downloads:
-            raise NotFoundError(remote_path)
-        payload = self.files.downloads[remote_path]
-        range_header = (headers or {}).get("Range")
+        path: str,
+        range_header: str | None = None,
+    ) -> bytes:
+        response = self.files.download(path)
+        payload = response.contents.read()
         if range_header is not None:
             payload = _apply_range_header(payload, range_header)
-        return {
-            "contents": BytesIO(payload),
-            "content-length": str(len(payload)),
-            "accept-ranges": "bytes",
-        }
+        return payload
+
+    async def open_read(self, path: str):
+        return FakeReadStream(self.files.download(path).contents)
+
+    async def get_metadata(self, path: str) -> object:
+        return self.files.get_metadata(path)
+
+    async def get_directory_metadata(self, path: str) -> object:
+        return self.files.get_directory_metadata(path)
+
+    async def list_directory(self, path: str) -> list[object]:
+        return list(self.files.list_directory_contents(path))
+
+    async def upload(self, path: str, data: bytes) -> None:
+        self.files.upload(path, BytesIO(data), overwrite=True)
+
+    async def delete(self, path: str) -> None:
+        self.files.delete(path)
+
+    async def create_directory(self, path: str) -> None:
+        self.files.create_directory(path)
+
+    async def delete_directory(self, path: str) -> None:
+        self.files.delete_directory(path)
 
 
-class FakeClient:
+class FakeReadStream:
 
-    def __init__(self, files: FakeFiles) -> None:
-        self.files = files
-        self.api_client = FakeApiClient(files)
+    def __init__(self, contents) -> None:
+        self.contents = contents
+
+    async def read(self, size: int = -1) -> bytes:
+        return self.contents.read(size)
+
+    async def close(self) -> None:
+        self.contents.close()
 
 
 def make_resource(files: FakeFiles) -> DatabricksVolumeResource:
-    return DatabricksVolumeResource(
+    return DatabricksVolumeResource._from_files_client(
         DatabricksVolumeConfig(
+            host="https://example.cloud.databricks.com",
             catalog="main",
             schema="default",
             volume="agent_files",
             root_path="/root",
-            token="secret",
         ),
-        client=FakeClient(files),
+        FakeDatabricksFilesClient(files),
     )
 
 
@@ -234,6 +245,7 @@ def seed_file(files: FakeFiles, path: str, data: bytes) -> None:
 
 def test_config_validation_and_normalization():
     config = DatabricksVolumeConfig(
+        host="https://example.cloud.databricks.com",
         catalog="main",
         schema="default",
         volume="agent_files",
@@ -242,14 +254,66 @@ def test_config_validation_and_normalization():
     assert config.root_path == "/nested/path"
     with pytest.raises(ValidationError):
         DatabricksVolumeConfig(
+            host="https://example.cloud.databricks.com",
             catalog="main/other",
             schema="default",
             volume="agent_files",
         )
 
 
+def test_config_requires_host():
+    with pytest.raises(ValidationError):
+        DatabricksVolumeConfig(
+            catalog="main",
+            schema="default",
+            volume="agent_files",
+        )
+
+
+def test_config_contains_no_credentials():
+    config = DatabricksVolumeConfig(
+        host="https://example.cloud.databricks.com",
+        catalog="main",
+        schema="default",
+        volume="agent_files",
+    )
+
+    assert "token" not in config.model_fields_set
+    assert not hasattr(config, "token")
+    assert not hasattr(config, "profile")
+
+
+def test_resource_accepts_token_provider_and_serializes_location_only():
+    config = DatabricksVolumeConfig(
+        host="https://example.cloud.databricks.com",
+        catalog="main",
+        schema="default",
+        volume="agent_files",
+    )
+    resource = DatabricksVolumeResource(
+        config,
+        token_provider=StaticTokenProvider("secret"),
+    )
+
+    state = resource.get_state()
+
+    assert state == {
+        "type": ResourceName.DATABRICKS_VOLUME,
+        "needs_override": True,
+        "config": {
+            "host": "https://example.cloud.databricks.com",
+            "catalog": "main",
+            "schema": "default",
+            "volume": "agent_files",
+            "root_path": "/",
+            "timeout": 30,
+        },
+    }
+
+
 def test_backend_path_uses_volume_root_and_strips_mount_prefix():
     config = DatabricksVolumeConfig(
+        host="https://example.cloud.databricks.com",
         catalog="main",
         schema="default",
         volume="agent_files",
@@ -265,15 +329,14 @@ def test_backend_path_uses_volume_root_and_strips_mount_prefix():
         path) == ("/Volumes/main/default/agent_files/root/reports/latest.md")
 
 
-def test_resource_state_redacts_token():
+def test_resource_state_requires_runtime_override():
     resource = make_resource(FakeFiles())
     state = resource.get_state()
     assert state["type"] == ResourceName.DATABRICKS_VOLUME
     assert state["needs_override"] is True
-    assert state["config"]["token"] == "<REDACTED>"
-    assert state["config"]["host"] is None
+    assert state["config"]["host"] == ("https://example.cloud.databricks.com")
     assert state["config"]["catalog"] == "main"
-    assert "token" in state["redacted_fields"]
+    assert "token" not in state["config"]
 
 
 def test_resource_registers_ops():

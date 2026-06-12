@@ -12,8 +12,6 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import asyncio
-
 from mirage.accessor.databricks_volume import DatabricksVolumeAccessor
 from mirage.cache.index import IndexCacheStore
 from mirage.core.databricks_volume._helpers import ensure_path_spec
@@ -21,20 +19,6 @@ from mirage.core.databricks_volume.errors import is_not_found
 from mirage.core.databricks_volume.path import backend_path
 from mirage.core.databricks_volume.stat import stat
 from mirage.types import FileType, PathSpec
-
-
-def _list_directory_sync(
-    accessor: DatabricksVolumeAccessor,
-    remote_path: str,
-) -> list:
-    return list(accessor.files.list_directory_contents(remote_path))
-
-
-def _delete_directory_sync(
-    accessor: DatabricksVolumeAccessor,
-    remote_path: str,
-) -> None:
-    accessor.files.delete_directory(remote_path)
 
 
 async def rmdir(
@@ -48,8 +32,7 @@ async def rmdir(
         raise NotADirectoryError(path.strip_prefix)
     remote_path = backend_path(accessor.config, path)
     try:
-        entries = await asyncio.to_thread(_list_directory_sync, accessor,
-                                          remote_path)
+        entries = await accessor.client.list_directory(remote_path)
     except Exception as exc:
         if is_not_found(exc):
             raise FileNotFoundError(path.strip_prefix) from exc
@@ -57,7 +40,7 @@ async def rmdir(
     if entries:
         raise OSError(f"directory not empty: {path.strip_prefix}")
     try:
-        await asyncio.to_thread(_delete_directory_sync, accessor, remote_path)
+        await accessor.client.delete_directory(remote_path)
     except Exception as exc:
         if is_not_found(exc):
             raise FileNotFoundError(path.strip_prefix) from exc

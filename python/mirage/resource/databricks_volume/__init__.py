@@ -13,8 +13,16 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 from mirage.resource.databricks_volume.config import DatabricksVolumeConfig
+from mirage.resource.databricks_volume.token_provider import (
+    DatabricksProfileTokenProvider, StaticTokenProvider, TokenProvider)
 
-__all__ = ["DatabricksVolumeConfig", "DatabricksVolumeResource"]
+__all__ = [
+    "DatabricksProfileTokenProvider",
+    "DatabricksVolumeConfig",
+    "DatabricksVolumeResource",
+    "StaticTokenProvider",
+    "TokenProvider",
+]
 
 
 def __getattr__(name: str):

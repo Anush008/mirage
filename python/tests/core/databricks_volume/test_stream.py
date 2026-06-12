@@ -12,7 +12,7 @@ class TrackingContents:
         self.read_sizes: list[int] = []
         self.closed = False
 
-    def read(self, size: int = -1) -> bytes:
+    async def read(self, size: int = -1) -> bytes:
         self.read_sizes.append(size)
         if size < 0:
             size = len(self.data) - self.offset
@@ -20,25 +20,19 @@ class TrackingContents:
         self.offset += len(chunk)
         return chunk
 
-    def close(self) -> None:
+    async def close(self) -> None:
         self.closed = True
 
 
-class TrackingDownload:
+class TrackingClient:
 
     def __init__(self, contents: TrackingContents) -> None:
         self.contents = contents
+        self.open_read_calls: list[str] = []
 
-
-class TrackingFiles:
-
-    def __init__(self, contents: TrackingContents) -> None:
-        self.contents = contents
-        self.download_calls: list[str] = []
-
-    def download(self, path: str) -> TrackingDownload:
-        self.download_calls.append(path)
-        return TrackingDownload(self.contents)
+    async def open_read(self, path: str) -> TrackingContents:
+        self.open_read_calls.append(path)
+        return self.contents
 
 
 @pytest.mark.asyncio
@@ -51,7 +45,7 @@ async def test_read_stream_chunks_file(accessor, files, remote_root):
     assert chunks == [b"ab", b"cd", b"ef"]
     # Streaming should use one download body, not one Range GET per chunk.
     assert files.download_calls == [f"{remote_root}/reports/latest.md"]
-    assert accessor.client.api_client.do_calls == []
+    assert accessor.client.read_calls == []
 
 
 @pytest.mark.asyncio
@@ -74,10 +68,8 @@ async def test_range_read_uses_single_databricks_range_request(
     result = await range_read(accessor, path, 1, 4)
 
     assert result == b"bcd"
-    assert files.download_calls == []
-    assert len(accessor.client.api_client.do_calls) == 1
-    assert accessor.client.api_client.do_calls[0]["headers"]["Range"] == (
-        "bytes=1-3")
+    assert accessor.client.read_calls == [(f"{remote_root}/reports/latest.md",
+                                           "bytes=1-3")]
 
 
 @pytest.mark.asyncio
@@ -86,8 +78,8 @@ async def test_read_stream_reads_single_download_body_in_chunks(
     remote_root,
 ):
     contents = TrackingContents(b"abcdef")
-    tracking_files = TrackingFiles(contents)
-    accessor.client.files = tracking_files
+    tracking_client = TrackingClient(contents)
+    accessor.client = tracking_client
     path = PathSpec.from_str_path("/volume/reports/latest.md", "/volume")
     stream = read_stream(accessor, path, chunk_size=2)
 
@@ -96,7 +88,7 @@ async def test_read_stream_reads_single_download_body_in_chunks(
 
     assert first == b"ab"
     assert second == b"cd"
-    assert tracking_files.download_calls == [
+    assert tracking_client.open_read_calls == [
         f"{remote_root}/reports/latest.md"
     ]
     assert contents.read_sizes == [2, 2]

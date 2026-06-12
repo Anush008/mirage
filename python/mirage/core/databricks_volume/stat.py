@@ -12,7 +12,6 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import asyncio
 from datetime import datetime, timezone
 
 from mirage.accessor.databricks_volume import DatabricksVolumeAccessor
@@ -54,8 +53,7 @@ async def _directory_stat_or_raise(
     path: PathSpec,
 ) -> FileStat:
     try:
-        await asyncio.to_thread(accessor.files.get_directory_metadata,
-                                remote_path)
+        await accessor.client.get_directory_metadata(remote_path)
     except Exception as exc:
         if is_not_found(exc):
             raise FileNotFoundError(path.strip_prefix) from exc
@@ -76,8 +74,7 @@ async def stat(
         return FileStat(name="/", type=FileType.DIRECTORY)
     remote_path = backend_path(accessor.config, path)
     try:
-        metadata = await asyncio.to_thread(accessor.files.get_metadata,
-                                           remote_path)
+        metadata = await accessor.client.get_metadata(remote_path)
     except Exception as exc:
         if is_not_found(exc):
             return await _directory_stat_or_raise(accessor, remote_path, path)

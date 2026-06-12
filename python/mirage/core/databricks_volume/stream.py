@@ -12,9 +12,7 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import asyncio
 from collections.abc import AsyncIterator
-from typing import BinaryIO
 
 from mirage.accessor.databricks_volume import DatabricksVolumeAccessor
 from mirage.cache.index import IndexCacheStore
@@ -23,23 +21,6 @@ from mirage.core.databricks_volume.path import backend_path
 from mirage.core.databricks_volume.read import read_bytes
 from mirage.observe.context import record_stream
 from mirage.types import PathSpec
-
-
-def _download_contents(response) -> BinaryIO:
-    if isinstance(response, dict):
-        contents = response.get("contents")
-    else:
-        contents = getattr(response, "contents", None)
-    if contents is None:
-        raise RuntimeError("Databricks download response has no contents")
-    return contents
-
-
-def _open_download_sync(
-    accessor: DatabricksVolumeAccessor,
-    remote_path: str,
-) -> BinaryIO:
-    return _download_contents(accessor.files.download(remote_path))
 
 
 async def read_stream(
@@ -56,13 +37,9 @@ async def read_stream(
     remote_path = backend_path(accessor.config, path)
     contents = None
     try:
-        contents = await asyncio.to_thread(
-            _open_download_sync,
-            accessor,
-            remote_path,
-        )
+        contents = await accessor.client.open_read(remote_path)
         while True:
-            chunk = await asyncio.to_thread(contents.read, chunk_size)
+            chunk = await contents.read(chunk_size)
             if not chunk:
                 return
             if rec is not None:
@@ -74,7 +51,7 @@ async def read_stream(
         raise
     finally:
         if contents is not None:
-            await asyncio.to_thread(contents.close)
+            await contents.close()
 
 
 async def range_read(

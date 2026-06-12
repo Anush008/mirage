@@ -27,10 +27,8 @@ class DatabricksVolumeConfig(BaseModel):
     # internal name avoids warning overwriting BaseModel.schema.
     schema_name: str = Field(alias="schema")
     volume: str
+    host: str
     root_path: str = "/"
-    host: str | None = None
-    token: str | None = None
-    profile: str | None = None
     timeout: int = 30
 
     @field_validator("catalog", "schema_name", "volume")

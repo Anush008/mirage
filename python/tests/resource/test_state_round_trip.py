@@ -21,6 +21,9 @@ from mirage.resource.disk import DiskResource
 from mirage.resource.ram import RAMResource
 from mirage.resource.redis import RedisResource
 from mirage.resource.s3 import S3Config, S3Resource
+from mirage.types import MountKey, StateKey
+from mirage.workspace.snapshot.state import (build_mount_args,
+                                             requires_resource_override)
 
 REDIS_URL = os.environ.get("REDIS_URL", "")
 
@@ -49,6 +52,55 @@ def test_ram_round_trip():
     dst.load_state(state)
     assert dst._store.files == {"/a.txt": b"hello", "/sub/b.txt": b"world"}
     assert "/sub" in dst._store.dirs
+
+
+def test_resource_state_needs_override_requires_resource_override():
+    mount_state = {
+        MountKey.RESOURCE_CLASS:
+        ("mirage.resource.databricks_volume.databricks_volume."
+         "DatabricksVolumeResource"),
+        MountKey.RESOURCE_STATE: {
+            "type": "databricks_volume",
+            "needs_override": True,
+            "config": {
+                "host": "https://example.cloud.databricks.com",
+                "catalog": "main",
+                "schema": "default",
+                "volume": "documents",
+                "root_path": "/",
+                "timeout": 30,
+            },
+        },
+    }
+
+    assert requires_resource_override(mount_state) is True
+
+
+def test_resource_state_needs_override_fails_without_override():
+    state = {
+        StateKey.MOUNTS: [{
+            MountKey.PREFIX:
+            "/dbx/",
+            MountKey.MODE:
+            "read",
+            MountKey.RESOURCE_CLASS:
+            ("mirage.resource.databricks_volume.databricks_volume."
+             "DatabricksVolumeResource"),
+            MountKey.RESOURCE_STATE: {
+                "type": "databricks_volume",
+                "needs_override": True,
+                "config": {
+                    "host": "https://example.cloud.databricks.com",
+                    "catalog": "main",
+                    "schema": "default",
+                    "volume": "documents",
+                },
+            },
+        }],
+    }
+
+    with pytest.raises(ValueError, match="resources=.*dbx"):
+        build_mount_args(state)
 
 
 # ── Disk ───────────────────────────────────────────────────────────────

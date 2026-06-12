@@ -12,8 +12,6 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import asyncio
-
 from mirage.accessor.databricks_volume import DatabricksVolumeAccessor
 from mirage.cache.index import IndexCacheStore
 from mirage.core.databricks_volume._helpers import (ensure_path_spec,
@@ -25,13 +23,6 @@ from mirage.core.databricks_volume.stat import stat
 from mirage.types import FileType, PathSpec
 
 
-def _create_directory_sync(
-    accessor: DatabricksVolumeAccessor,
-    remote_path: str,
-) -> None:
-    accessor.files.create_directory(remote_path)
-
-
 async def mkdir(
     accessor: DatabricksVolumeAccessor,
     path: PathSpec,
@@ -41,7 +32,7 @@ async def mkdir(
     path = ensure_path_spec(path)
     remote_path = backend_path(accessor.config, path)
     if parents:
-        await asyncio.to_thread(_create_directory_sync, accessor, remote_path)
+        await accessor.client.create_directory(remote_path)
         return
     if await exists(accessor, path):
         raise FileExistsError(path.strip_prefix)
@@ -50,7 +41,7 @@ async def mkdir(
     if parent_stat.type != FileType.DIRECTORY:
         raise NotADirectoryError(path.strip_prefix)
     try:
-        await asyncio.to_thread(_create_directory_sync, accessor, remote_path)
+        await accessor.client.create_directory(remote_path)
     except Exception as exc:
         if is_not_found(exc):
             raise FileNotFoundError(path.strip_prefix) from exc

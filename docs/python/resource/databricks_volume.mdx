@@ -17,14 +17,19 @@ from mirage import MountMode, Workspace
 from mirage.resource.databricks_volume import (
     DatabricksVolumeConfig,
     DatabricksVolumeResource,
+    StaticTokenProvider,
 )
 
-resource = DatabricksVolumeResource(DatabricksVolumeConfig(
-    catalog="main",
-    schema="default",
-    volume="agent_files",
-    root_path="/reports",
-))
+resource = DatabricksVolumeResource(
+    DatabricksVolumeConfig(
+        host="https://example.cloud.databricks.com",
+        catalog="main",
+        schema="default",
+        volume="agent_files",
+        root_path="/reports",
+    ),
+    token_provider=StaticTokenProvider("token"),
+)
 ws = Workspace({"/dbx": resource}, mode=MountMode.READ)
 ```
 
@@ -33,11 +38,14 @@ ws = Workspace({"/dbx": resource}, mode=MountMode.READ)
 | `catalog` | required | Unity Catalog catalog name. |
 | `schema` | required | Unity Catalog schema name. |
 | `volume` | required | Unity Catalog volume name. |
+| `host` | required | Databricks workspace host. |
 | `root_path` | `/` | Subdirectory inside the volume to expose. |
-| `host` | `None` | Optional workspace host override. |
-| `token` | `None` | Optional PAT override. Redacted in snapshots. |
-| `profile` | `None` | Optional Databricks SDK profile name. |
 | `timeout` | `30` | Request timeout in seconds. |
+
+Credentials are supplied separately through a token provider. Mirage includes
+`StaticTokenProvider` for fixed tokens and `DatabricksProfileTokenProvider` for
+Databricks CLI profiles. Applications can implement `get_token()` to supply
+rotating or request-scoped tokens.
 
 ## Mount mode
 
@@ -51,6 +59,7 @@ Given:
 
 ```python
 DatabricksVolumeConfig(
+    host="https://example.cloud.databricks.com",
     catalog="main",
     schema="default",
     volume="agent_files",
@@ -134,21 +143,38 @@ or local-only utilities).
 
 ## Snapshot behavior
 
-`token` is redacted in resource state. Loading a snapshot back requires an
-override config that provides fresh credentials if the runtime auth chain does
-not already supply them.
+Snapshots contain the volume location config but never the token provider.
+Loading a snapshot requires a full resource override for the mount:
+
+```python
+workspace = Workspace.load(
+    snapshot,
+    resources={"/dbx/": resource},
+)
+```
 
 ## Databricks Apps
 
-For Databricks Apps, prefer SDK-default auth and keep Mirage in-process:
+For Databricks Apps, pass an application-owned provider. Its `get_token()`
+method can read the current request's OBO token or return a service-principal
+token managed by the application:
 
 ```python
+class AppTokenProvider:
+    def get_token(self) -> str:
+        return current_request_token.get()
+
+
 config = DatabricksVolumeConfig(
+    host="https://example.cloud.databricks.com",
     catalog="main",
     schema="default",
     volume="agent_files",
 )
-resource = DatabricksVolumeResource(config)
+resource = DatabricksVolumeResource(
+    config,
+    token_provider=AppTokenProvider(),
+)
 ws = Workspace({"/dbx/": resource}, mode=MountMode.READ)
 ```
 
@@ -162,16 +188,22 @@ import asyncio
 
 from mirage import MountMode, Workspace
 from mirage.resource.databricks_volume import (
+    DatabricksProfileTokenProvider,
     DatabricksVolumeConfig,
     DatabricksVolumeResource,
 )
 
-resource = DatabricksVolumeResource(DatabricksVolumeConfig(
-    catalog="main",
-    schema="default",
-    volume="agent_files",
-    root_path="/reports",
-))
+host = "https://example.cloud.databricks.com"
+resource = DatabricksVolumeResource(
+    DatabricksVolumeConfig(
+        host=host,
+        catalog="main",
+        schema="default",
+        volume="agent_files",
+        root_path="/reports",
+    ),
+    token_provider=DatabricksProfileTokenProvider(host),
+)
 
 
 async def main() -> None:

@@ -13,11 +13,13 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import dataclasses
-from typing import Any
+from typing import Any, Self
 
 from mirage.accessor.databricks_volume import DatabricksVolumeAccessor
 from mirage.commands.builtin.databricks_volume import \
     COMMANDS as DATABRICKS_VOLUME_COMMANDS
+from mirage.core.databricks_volume.client import (DatabricksFilesClient,
+                                                  SdkDatabricksFilesClient)
 from mirage.core.databricks_volume.copy import copy
 from mirage.core.databricks_volume.create import create
 from mirage.core.databricks_volume.exists import exists
@@ -36,6 +38,7 @@ from mirage.ops.databricks_volume import OPS as DATABRICKS_VOLUME_OPS
 from mirage.resource.base import BaseResource
 from mirage.resource.databricks_volume.config import DatabricksVolumeConfig
 from mirage.resource.databricks_volume.prompt import PROMPT
+from mirage.resource.databricks_volume.token_provider import TokenProvider
 from mirage.types import PathSpec, ResourceName
 
 _DATABRICKS_VOLUME_OPS = {
@@ -65,11 +68,31 @@ class DatabricksVolumeResource(BaseResource):
     def __init__(
         self,
         config: DatabricksVolumeConfig,
-        client: Any | None = None,
+        token_provider: TokenProvider,
+    ) -> None:
+        self._initialize(
+            config,
+            SdkDatabricksFilesClient(config, token_provider),
+        )
+
+    @classmethod
+    def _from_files_client(
+        cls,
+        config: DatabricksVolumeConfig,
+        files_client: DatabricksFilesClient,
+    ) -> Self:
+        resource = cls.__new__(cls)
+        resource._initialize(config, files_client)
+        return resource
+
+    def _initialize(
+        self,
+        config: DatabricksVolumeConfig,
+        files_client: DatabricksFilesClient,
     ) -> None:
         super().__init__()
         self.config = config
-        self.accessor = DatabricksVolumeAccessor(self.config, client)
+        self.accessor = DatabricksVolumeAccessor(self.config, files_client)
 
         for fn in DATABRICKS_VOLUME_COMMANDS:
             self.register(fn)
@@ -86,16 +109,12 @@ class DatabricksVolumeResource(BaseResource):
         return await _resolve_glob(self.accessor, paths, self._index)
 
     def get_state(self) -> dict:
-        redacted = ["token"]
-        cfg = self.config.model_dump()
-        for field in redacted:
-            if cfg.get(field) is not None:
-                cfg[field] = "<REDACTED>"
         return {
             "type": self.name,
+            # Token providers are runtime-only and cannot be reconstructed
+            # from the serialized volume location.
             "needs_override": True,
-            "redacted_fields": redacted,
-            "config": cfg,
+            "config": self.config.model_dump(),
         }
 
     def load_state(self, state: dict) -> None:

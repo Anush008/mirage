@@ -324,6 +324,10 @@ def _construct_resource(mount_state: dict):
 
 def requires_resource_override(mount_state: dict) -> bool:
     resource_state = mount_state[MountKey.RESOURCE_STATE]
+    # Resources can explicitly omit runtime-only constructor dependencies
+    # from snapshot state even when their serialized config has no secrets.
+    if resource_state.get("needs_override") is True:
+        return True
     config = resource_state.get(ResourceStateKey.CONFIG)
     config_cls = _config_class_for(_resource_class_for(mount_state))
     return has_redacted_secret(config, config_cls)

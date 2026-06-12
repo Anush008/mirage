@@ -15,53 +15,80 @@ guide.
 
 ## Configuration
 
-### Databricks Apps or SDK-default auth
-
-```python
-from mirage import Workspace, MountMode
-from mirage.resource.databricks_volume import (
-    DatabricksVolumeConfig,
-    DatabricksVolumeResource,
-)
-
-config = DatabricksVolumeConfig(
-    catalog="main",
-    schema="default",
-    volume="agent_files",
-)
-resource = DatabricksVolumeResource(config=config)
-ws = Workspace({"/dbx/": resource}, mode=MountMode.READ)
-```
-
-### Explicit host and token
+### Static token
 
 ```python
 import os
 
+from mirage import Workspace, MountMode
+from mirage.resource.databricks_volume import (
+    DatabricksVolumeConfig,
+    DatabricksVolumeResource,
+    StaticTokenProvider,
+)
+
 config = DatabricksVolumeConfig(
+    host=os.environ["DATABRICKS_HOST"],
     catalog="main",
     schema="default",
     volume="agent_files",
-    host=os.environ["DATABRICKS_HOST"],
-    token=os.environ["DATABRICKS_TOKEN"],
     root_path="/reports",
 )
-resource = DatabricksVolumeResource(config=config)
+resource = DatabricksVolumeResource(
+    config,
+    token_provider=StaticTokenProvider(os.environ["DATABRICKS_TOKEN"]),
+)
 ws = Workspace({"/dbx/": resource}, mode=MountMode.READ)
 ```
 
 ### Profile-based auth
 
 ```python
+import os
+
+from mirage.resource.databricks_volume import DatabricksProfileTokenProvider
+
+host = os.environ["DATABRICKS_HOST"]
 config = DatabricksVolumeConfig(
+    host=host,
     catalog="main",
     schema="default",
     volume="agent_files",
-    profile="DEV",
 )
-resource = DatabricksVolumeResource(config=config)
+resource = DatabricksVolumeResource(
+    config,
+    token_provider=DatabricksProfileTokenProvider(host, profile="DEV"),
+)
 ws = Workspace({"/dbx/": resource}, mode=MountMode.READ)
 ```
+
+### Custom token strategy
+
+Implement `get_token()` when the application owns token caching, refresh, or
+request-scoped OBO credentials. It may return a string or an awaitable string.
+
+```python
+class AppTokenProvider:
+    async def get_token(self) -> str:
+        return await application_credentials.current_token()
+
+
+config = DatabricksVolumeConfig(
+    host="https://example.cloud.databricks.com",
+    catalog="main",
+    schema="default",
+    volume="agent_files",
+)
+resource = DatabricksVolumeResource(
+    config,
+    token_provider=AppTokenProvider(),
+)
+ws = Workspace({"/dbx/": resource}, mode=MountMode.READ)
+```
+
+Mirage asks the provider for a token at each Files API operation. The provider
+decides whether to return a cached token or refresh it. Mirage does not retry a
+rejected token.
 
 ## Config Reference
 
@@ -70,14 +97,12 @@ ws = Workspace({"/dbx/": resource}, mode=MountMode.READ)
 | `catalog` | Yes |  | Unity Catalog catalog name. |
 | `schema` | Yes |  | Unity Catalog schema name. |
 | `volume` | Yes |  | Unity Catalog volume name. |
+| `host` | Yes |  | Databricks workspace host. |
 | `root_path` | No | `/` | Subdirectory inside the volume to expose. |
-| `host` | No |  | Databricks workspace host. |
-| `token` | No |  | Databricks personal access token. Redacted in snapshots. |
-| `profile` | No |  | Databricks SDK profile name. |
 | `timeout` | No | `30` | Request timeout in seconds. |
 
 ## Notes
 
 - Supports both read and write mount modes (`MountMode.READ` / `MountMode.WRITE`).
-- Auth falls through to the Databricks SDK defaults when `host`, `token`, and `profile` are omitted.
+- Credentials are supplied separately through a token provider and are never serialized.
 - `root_path` is normalized and cannot contain `..`.

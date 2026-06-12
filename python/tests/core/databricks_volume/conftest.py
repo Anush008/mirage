@@ -1,7 +1,6 @@
 import posixpath
 from io import BytesIO
 from types import SimpleNamespace
-from urllib.parse import unquote
 
 import pytest
 
@@ -13,16 +12,6 @@ from mirage.resource.databricks_volume import DatabricksVolumeConfig
 
 class NotFoundError(Exception):
     status_code = 404
-
-
-class ToThreadRecorder:
-
-    def __init__(self) -> None:
-        self.calls = []
-
-    async def __call__(self, fn, *args, **kwargs):
-        self.calls.append((fn, args, kwargs))
-        return fn(*args, **kwargs)
 
 
 class FakeDownload:
@@ -152,71 +141,70 @@ def _apply_range_header(data: bytes, range_header: str) -> bytes:
     return data[start:end]
 
 
-class FakeApiClient:
+class FakeDatabricksFilesClient:
 
     def __init__(self, files: FakeFiles) -> None:
         self.files = files
-        self.do_calls: list[dict[str, object]] = []
+        self.read_calls: list[tuple[str, str | None]] = []
 
-    def do(
+    async def read_bytes(
         self,
-        method: str,
-        path: str | None = None,
-        url: str | None = None,
-        query: dict | None = None,
-        headers: dict | None = None,
-        body: dict | None = None,
-        raw: bool = False,
-        files: object = None,
-        data: object = None,
-        auth: object = None,
-        response_headers: list[str] | None = None,
-    ) -> dict:
-        call = {
-            "method": method,
-            "path": path,
-            "url": url,
-            "query": query,
-            "headers": headers or {},
-            "body": body,
-            "raw": raw,
-            "files": files,
-            "data": data,
-            "auth": auth,
-            "response_headers": response_headers,
-        }
-        self.do_calls.append(call)
-        if method != "GET" or path is None:
-            raise ValueError(f"unsupported fake API call: {method} {path}")
-        remote_path = unquote(path.removeprefix("/api/2.0/fs/files"))
-        if remote_path not in self.files.downloads:
-            raise NotFoundError(remote_path)
-        payload = self.files.downloads[remote_path]
-        range_header = (headers or {}).get("Range")
+        path: str,
+        range_header: str | None = None,
+    ) -> bytes:
+        self.read_calls.append((path, range_header))
+        response = self.files.download(path)
+        payload = response.contents.read()
         if range_header is not None:
             payload = _apply_range_header(payload, range_header)
-        return {
-            "contents": BytesIO(payload),
-            "content-length": str(len(payload)),
-            "accept-ranges": "bytes",
-        }
+
+        return payload
+
+    async def open_read(self, path: str):
+        return FakeReadStream(self.files.download(path).contents)
+
+    async def get_metadata(self, path: str) -> object:
+        return self.files.get_metadata(path)
+
+    async def get_directory_metadata(self, path: str) -> object:
+        return self.files.get_directory_metadata(path)
+
+    async def list_directory(self, path: str) -> list[object]:
+        return list(self.files.list_directory_contents(path))
+
+    async def upload(self, path: str, data: bytes) -> None:
+        self.files.upload(path, BytesIO(data), overwrite=True)
+
+    async def delete(self, path: str) -> None:
+        self.files.delete(path)
+
+    async def create_directory(self, path: str) -> None:
+        self.files.create_directory(path)
+
+    async def delete_directory(self, path: str) -> None:
+        self.files.delete_directory(path)
 
 
-class FakeClient:
+class FakeReadStream:
 
-    def __init__(self, files: FakeFiles) -> None:
-        self.files = files
-        self.api_client = FakeApiClient(files)
+    def __init__(self, contents) -> None:
+        self.contents = contents
+
+    async def read(self, size: int = -1) -> bytes:
+        return self.contents.read(size)
+
+    async def close(self) -> None:
+        self.contents.close()
 
 
 @pytest.fixture
 def databricks_config() -> DatabricksVolumeConfig:
     return DatabricksVolumeConfig(
+        host="https://example.cloud.databricks.com",
         catalog="main",
         schema="default",
         volume="agent_files",
         root_path="/root",
-        token="secret",
     )
 
 
@@ -235,7 +223,10 @@ def accessor(
     databricks_config: DatabricksVolumeConfig,
     files: FakeFiles,
 ) -> DatabricksVolumeAccessor:
-    return DatabricksVolumeAccessor(databricks_config, FakeClient(files))
+    return DatabricksVolumeAccessor(
+        databricks_config,
+        FakeDatabricksFilesClient(files),
+    )
 
 
 @pytest.fixture

@@ -42,6 +42,7 @@ def test_backend_path_rejects_escape_above_configured_root(databricks_config):
 def test_config_rejects_parent_segments_in_root_path():
     with pytest.raises(ValidationError):
         DatabricksVolumeConfig(
+            host="https://example.cloud.databricks.com",
             catalog="main",
             schema="default",
             volume="agent_files",

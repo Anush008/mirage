@@ -20,7 +20,5 @@ async def test_head_bytes_mode_uses_single_small_range_request(
     source, _io = await head(accessor, [path], c="3")
 
     assert await collect_bytes(source) == b"abc"
-    assert files.download_calls == []
-    assert len(accessor.client.api_client.do_calls) == 1
-    assert accessor.client.api_client.do_calls[0]["headers"]["Range"] == (
-        "bytes=0-2")
+    assert accessor.client.read_calls == [(f"{remote_root}/reports/latest.md",
+                                           "bytes=0-2")]
