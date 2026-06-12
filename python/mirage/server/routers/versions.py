@@ -35,7 +35,7 @@ router = APIRouter(prefix="/v1")
 
 
 async def _state_of(ws: Workspace) -> dict:
-    return to_state_dict(ws)
+    return await to_state_dict(ws)
 
 
 @router.post("/workspaces/{workspace_id}/commit",
@@ -135,7 +135,7 @@ async def checkout_version(workspace_id: str, req: CheckoutRequest,
     except KeyError:
         raise HTTPException(status_code=404,
                             detail=f"version not found: {req.ref}")
-    return make_detail(entry)
+    return await make_detail(entry)
 
 
 @router.post("/workspaces/clone",
@@ -156,7 +156,7 @@ async def clone_workspace_version(req: CloneRequest,
         except KeyError:
             raise HTTPException(status_code=404,
                                 detail=f"version not found: {req.at}")
-        ws = Workspace.from_state(to_state(entries, meta))
+        ws = await Workspace.from_state(to_state(entries, meta))
     else:
         if req.source_id not in registry:
             raise HTTPException(status_code=404, detail="workspace not found")
@@ -167,4 +167,4 @@ async def clone_workspace_version(req: CloneRequest,
         entry = registry.add(ws, workspace_id=req.id)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    return make_detail(entry)
+    return await make_detail(entry)

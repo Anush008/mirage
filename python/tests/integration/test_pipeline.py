@@ -390,7 +390,7 @@ async def test_history_tracks_session_id(ws):
     ws.create_session("s-hist")
     ws.get_session("s-hist").cwd = "/"
     await ws.execute("echo tracked", session_id="s-hist")
-    records = [e for e in ws.history if e["session"] == "s-hist"]
+    records = [e for e in await ws.history() if e["session"] == "s-hist"]
     assert len(records) == 1
     assert records[0]["command"] == "echo tracked"
 

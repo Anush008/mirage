@@ -12,7 +12,7 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from mirage.accessor.base import Accessor, NOOPAccessor
+from mirage.accessor.history import HistoryAccessor
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
 from mirage.core.history.render import render_history_listing
@@ -24,7 +24,7 @@ DEFAULT_SESSION = "default"
 
 @command("history", resource="history", spec=SPECS["history"])
 async def history_cmd(
-    accessor: Accessor = NOOPAccessor(),
+    accessor: HistoryAccessor,
     paths: list[PathSpec] | None = None,
     *texts: str,
     stdin: bytes | None = None,
@@ -44,6 +44,6 @@ async def history_cmd(
         except ValueError:
             err = f"history: {texts[0]}: numeric argument required\n".encode()
             return None, IOResult(exit_code=1, stderr=err)
-    events = observer.session_command_events(session)
+    events = await observer.session_command_events(session)
     output = render_history_listing(events, n=n)
     return output.encode(), IOResult()

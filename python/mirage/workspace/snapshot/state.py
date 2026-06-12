@@ -35,7 +35,7 @@ def _mirage_version() -> str:
         return "unknown"
 
 
-def to_state_dict(ws) -> dict:
+async def to_state_dict(ws) -> dict:
     auto_prefixes = {"/dev/", norm_mount_prefix(HISTORY_PREFIX)}
 
     mounts_state = []
@@ -62,7 +62,7 @@ def to_state_dict(ws) -> dict:
     } for k, e in cache._entries.items()]
 
     history_events = [
-        e for e in ws.observer.events()
+        e for e in await ws.observer.events()
         if e.get("type") in ("command", "clear")
     ]
 
@@ -139,7 +139,7 @@ def build_mount_args(state: dict, resources: dict | None = None) -> MountArgs:
     )
 
 
-def apply_state_dict(ws, state: dict) -> None:
+async def apply_state_dict(ws, state: dict) -> None:
     """Restore post-construction state into an already-built Workspace.
 
     Restores: resource load_state (content, fresh disk root, etc.),
@@ -164,7 +164,7 @@ def apply_state_dict(ws, state: dict) -> None:
                                      ws._default_agent_id)
 
     _restore_cache(ws, state)
-    _restore_history(ws, state)
+    await _restore_history(ws, state)
     _restore_jobs(ws, state)
 
 
@@ -206,11 +206,11 @@ def _restore_cache(ws, state: dict) -> None:
         cache._cache_size += entry.get(CacheKey.SIZE, len(data))
 
 
-def _restore_history(ws, state: dict) -> None:
+async def _restore_history(ws, state: dict) -> None:
     events = state.get(StateKey.HISTORY)
     if not events:
         return
-    ws.observer.load_events(events)
+    await ws.observer.load_events(events)
 
 
 def _restore_jobs(ws, state: dict) -> None:

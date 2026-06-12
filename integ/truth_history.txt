@@ -69,4 +69,5 @@ ops_have_source=True
 s2_after_clear=['history -c', 'history']
 default_first=echo marker-one
 === observer_not_mounted ===
+mounts=['/.bash_history/', '/data/', '/dev/']
 recorder_mounted=False

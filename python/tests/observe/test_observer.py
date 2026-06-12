@@ -18,14 +18,14 @@ import time
 
 from mirage.observe import OpRecord
 from mirage.observe.observer import Observer
-from mirage.resource.ram import RAMResource
+from mirage.observe.store import RAMObserverStore
 from mirage.utils.dates import utc_date_folder
 from mirage.workspace.types import ExecutionNode, ExecutionRecord
 
 
 def test_log_op_writes_jsonl():
-    resource = RAMResource()
-    obs = Observer(resource=resource)
+    store = RAMObserverStore()
+    obs = Observer(store=store)
     rec = OpRecord(
         op="read",
         path="/data/f.csv",
@@ -35,7 +35,7 @@ def test_log_op_writes_jsonl():
         duration_ms=5,
     )
     asyncio.run(obs.log_op(rec, agent="agent-1", session="sess-1"))
-    data = resource._store.files[f"/{utc_date_folder()}/sess-1.jsonl"]
+    data = store.files[f"/{utc_date_folder()}/sess-1.jsonl"]
     parsed = json.loads(data.decode().strip())
     assert parsed["type"] == "op"
     assert parsed["agent"] == "agent-1"
@@ -44,8 +44,8 @@ def test_log_op_writes_jsonl():
 
 
 def test_log_command_writes_jsonl():
-    resource = RAMResource()
-    obs = Observer(resource=resource)
+    store = RAMObserverStore()
+    obs = Observer(store=store)
     rec = ExecutionRecord(
         agent="agent-1",
         command="ls /data",
@@ -57,7 +57,7 @@ def test_log_command_writes_jsonl():
         session_id="sess-1",
     )
     asyncio.run(obs.log_command(rec))
-    data = resource._store.files[f"/{utc_date_folder()}/sess-1.jsonl"]
+    data = store.files[f"/{utc_date_folder()}/sess-1.jsonl"]
     parsed = json.loads(data.decode().strip())
     assert parsed["type"] == "command"
     assert parsed["session"] == "sess-1"
@@ -65,8 +65,8 @@ def test_log_command_writes_jsonl():
 
 
 def test_multiple_entries_appended():
-    resource = RAMResource()
-    obs = Observer(resource=resource)
+    store = RAMObserverStore()
+    obs = Observer(store=store)
     for i in range(3):
         rec = OpRecord(
             op="read",
@@ -77,7 +77,7 @@ def test_multiple_entries_appended():
             duration_ms=1,
         )
         asyncio.run(obs.log_op(rec, agent="a", session="s"))
-    data = resource._store.files[f"/{utc_date_folder()}/s.jsonl"]
+    data = store.files[f"/{utc_date_folder()}/s.jsonl"]
     lines = data.decode().strip().split("\n")
     assert len(lines) == 3
 
@@ -95,18 +95,21 @@ def _command_record(command: str, session: str, ts: float) -> ExecutionRecord:
     )
 
 
+def test_default_store_is_ram():
+    obs = Observer()
+    assert isinstance(obs.store, RAMObserverStore)
+
+
 def test_log_clear_appends_tombstone():
-    resource = RAMResource()
-    obs = Observer(resource=resource)
+    obs = Observer()
     asyncio.run(obs.log_clear(session="s1", agent="a1"))
-    events = obs.events()
+    events = asyncio.run(obs.events())
     assert events[-1]["type"] == "clear"
     assert events[-1]["session"] == "s1"
 
 
 def test_command_events_all_sessions_ordered():
-    resource = RAMResource()
-    obs = Observer(resource=resource)
+    obs = Observer()
     asyncio.run(obs.log_command(_command_record("ls /a", "s2", 2.0)))
     asyncio.run(obs.log_command(_command_record("ls /b", "s1", 1.0)))
     op = OpRecord(
@@ -118,37 +121,46 @@ def test_command_events_all_sessions_ordered():
         duration_ms=1,
     )
     asyncio.run(obs.log_op(op, agent="a", session="s1"))
-    events = obs.command_events()
+    events = asyncio.run(obs.command_events())
     assert [e["command"] for e in events] == ["ls /b", "ls /a"]
     assert all(e["type"] == "command" for e in events)
 
 
 def test_command_events_same_timestamp_keeps_append_order():
-    resource = RAMResource()
-    obs = Observer(resource=resource)
+    obs = Observer()
     asyncio.run(obs.log_command(_command_record("first", "s2", 1.0)))
     asyncio.run(obs.log_command(_command_record("second", "s1", 1.0)))
     asyncio.run(obs.log_command(_command_record("third", "s2", 1.0)))
-    events = obs.command_events()
+    events = asyncio.run(obs.command_events())
     assert [e["command"] for e in events] == ["first", "second", "third"]
 
 
 def test_session_command_events_respects_last_clear():
-    resource = RAMResource()
-    obs = Observer(resource=resource)
+    obs = Observer()
     asyncio.run(obs.log_command(_command_record("cmd A", "s1", 1.0)))
     asyncio.run(obs.log_clear(session="s1", agent="a"))
     asyncio.run(obs.log_command(_command_record("cmd B", "s1", 2.0)))
     asyncio.run(obs.log_command(_command_record("cmd C", "s2", 3.0)))
-    s1 = obs.session_command_events("s1")
-    s2 = obs.session_command_events("s2")
+    s1 = asyncio.run(obs.session_command_events("s1"))
+    s2 = asyncio.run(obs.session_command_events("s2"))
     assert [e["command"] for e in s1] == ["cmd B"]
     assert [e["command"] for e in s2] == ["cmd C"]
 
 
+def test_load_events_restores_and_resumes_seq():
+    obs = Observer()
+    asyncio.run(obs.log_command(_command_record("old", "s1", 1.0)))
+    events = asyncio.run(obs.events())
+    restored = Observer()
+    asyncio.run(restored.load_events(events))
+    asyncio.run(restored.log_command(_command_record("new", "s1", 2.0)))
+    out = asyncio.run(restored.command_events())
+    assert [e["command"] for e in out] == ["old", "new"]
+    assert out[1]["seq"] > out[0]["seq"]
+
+
 def test_observer_sessions_tracked():
-    resource = RAMResource()
-    obs = Observer(resource=resource)
+    obs = Observer()
     rec = OpRecord(
         op="stat",
         path="/f",

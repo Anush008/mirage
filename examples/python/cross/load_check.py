@@ -102,10 +102,10 @@ async def main():
 
     tar_path = expected_doc["tar_path"]
     print(f"=== loading {tar_path} ===")
-    ws = Workspace.load(tar_path, resources=_fresh_resources())
+    ws = await Workspace.load(tar_path, resources=_fresh_resources())
     mounts = sorted(m.prefix for m in ws.mounts())
     print(f"  mounts: {mounts}")
-    print(f"  loaded history entries: {len(ws.history)}")
+    print(f"  loaded history entries: {len(await ws.history())}")
 
     # gdrive index belongs to the freshly-supplied resource (override
     # drops the saved index). Repopulate it the same way the original

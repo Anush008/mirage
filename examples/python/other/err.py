@@ -143,7 +143,7 @@ async def main():
     print(" Execution History")
     print(f"{'═' * 60}")
 
-    for entry in ws.history[-6:]:
+    for entry in (await ws.history())[-6:]:
         print(f"\n  $ {entry['command']}")
         print(f"    exit={entry['exit_code']}")
 

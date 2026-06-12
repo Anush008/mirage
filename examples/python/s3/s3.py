@@ -421,7 +421,7 @@ async def main():
 
     # ── execution history: hidden recorder + GNU views ──
     print("\n=== EXECUTION HISTORY ===\n")
-    events = ws.history
+    events = await ws.history()
     print(f"  Total commands recorded: {len(events)}")
 
     entry = events[-1]
@@ -502,7 +502,7 @@ async def main():
 
     print("\n--- background job history ---")
     bg_entries = [
-        e for e in ws.history
+        e for e in await ws.history()
         if "grep" in e["command"] and "&" not in e["command"]
     ]
     print(f"  Background job records: {len(bg_entries)}")
@@ -601,14 +601,14 @@ async def main():
 
         # Loading without resources= must fail fast
         try:
-            Workspace.load(snap)
+            await Workspace.load(snap)
             print("  ✗ load() should have raised without resources=")
         except ValueError as e:
             print(f"  ✓ load() w/o resources raises: "
                   f"{str(e).splitlines()[0][:70]}…")
 
         # Load with fresh creds (both mounts were redacted)
-        loaded = Workspace.load(
+        loaded = await Workspace.load(
             snap,
             resources={
                 "/s3/": S3Resource(config),
@@ -660,8 +660,8 @@ async def main():
         s2 = await drift_ws.stat(probe)
         print(f"  mutated on bucket: new revision={s2.revision}")
 
-        loaded = Workspace.load(drift_snap,
-                                resources={"/s3/": S3Resource(config)})
+        loaded = await Workspace.load(drift_snap,
+                                      resources={"/s3/": S3Resource(config)})
         loaded._cache.evict_paths([probe])
         try:
             r = await loaded.execute(f"cat {probe}")

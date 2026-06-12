@@ -36,4 +36,5 @@ async def read(accessor: HistoryAccessor,
     key = path.strip_prefix if isinstance(path, PathSpec) else path
     if key.strip("/") not in _VIEW_KEYS:
         raise FileNotFoundError(key)
-    return render_bash_history(accessor.observer.command_events()).encode()
+    events = await accessor.observer.command_events()
+    return render_bash_history(events).encode()

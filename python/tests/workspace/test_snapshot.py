@@ -26,6 +26,10 @@ from mirage.workspace import Workspace
 from mirage.workspace.snapshot import to_state_dict
 
 
+def _load(*args, **kwargs):
+    return asyncio.run(Workspace.load(*args, **kwargs))
+
+
 def _seed(ws, mount: str = "/m") -> None:
 
     async def _do():
@@ -56,7 +60,7 @@ def test_save_load_ram_round_trip(tmp_path):
     asyncio.run(src.snapshot(snap))
     assert snap.exists() and snap.stat().st_size > 0
 
-    dst = Workspace.load(snap)
+    dst = _load(snap)
     assert _read(dst, "/m/a.txt") == "hello\n"
     assert _read(dst, "/m/sub/b.txt") == "world\n"
 
@@ -66,7 +70,7 @@ def test_from_state_rebuilds_in_process_without_tar():
                     mode=MountMode.WRITE)
     _seed(src)
 
-    dst = Workspace.from_state(to_state_dict(src))
+    dst = asyncio.run(Workspace.from_state(asyncio.run(to_state_dict(src))))
     assert _read(dst, "/m/a.txt") == "hello\n"
     assert _read(dst, "/m/sub/b.txt") == "world\n"
 
@@ -78,7 +82,7 @@ def test_save_load_ram_compressed_gz(tmp_path):
     snap = tmp_path / "ram.tar.gz"
     asyncio.run(src.snapshot(snap, compress="gz"))
 
-    dst = Workspace.load(snap)
+    dst = _load(snap)
     assert _read(dst, "/m/a.txt") == "hello\n"
 
 
@@ -95,7 +99,7 @@ def test_save_load_disk_round_trip(tmp_path):
     snap = tmp_path / "disk.tar"
     asyncio.run(src.snapshot(snap))
 
-    dst = Workspace.load(snap)
+    dst = _load(snap)
     assert _read(dst, "/m/a.txt") == "hello\n"
     assert _read(dst, "/m/sub/b.txt") == "world\n"
 
@@ -112,8 +116,7 @@ def test_save_load_disk_with_override_root(tmp_path):
 
     dst_root = tmp_path / "dst"
     dst_root.mkdir()
-    dst = Workspace.load(snap,
-                         resources={"/m": DiskResource(root=str(dst_root))})
+    dst = _load(snap, resources={"/m": DiskResource(root=str(dst_root))})
     assert (dst_root / "a.txt").read_bytes() == b"hello\n"
     assert (dst_root / "sub" / "b.txt").read_bytes() == b"world\n"
     assert _read(dst, "/m/a.txt") == "hello\n"
@@ -133,7 +136,7 @@ def test_redacted_secret_missing_resource_raises(tmp_path):
     asyncio.run(src.snapshot(snap))
 
     with pytest.raises(ValueError, match=r"resources="):
-        Workspace.load(snap)
+        _load(snap)
 
 
 def test_redacted_secret_lists_all_missing(tmp_path):
@@ -156,7 +159,7 @@ def test_redacted_secret_lists_all_missing(tmp_path):
     asyncio.run(src.snapshot(snap))
 
     with pytest.raises(ValueError) as ei:
-        Workspace.load(snap)
+        _load(snap)
     msg = str(ei.value)
     assert "/s3a" in msg
     assert "/s3b" in msg
@@ -169,7 +172,7 @@ def test_s3_without_inline_secret_loads_without_override(tmp_path):
     snap = tmp_path / "s3-profile.tar"
     asyncio.run(src.snapshot(snap))
 
-    dst = Workspace.load(snap)
+    dst = _load(snap)
     mount = dst._registry.mount_for("/s3/")
     assert isinstance(mount.resource, S3Resource)
     assert mount.resource.config.aws_profile == "dev"
@@ -283,7 +286,7 @@ def test_load_rejects_path_traversal_in_blob_ref(tmp_path):
         tar.addfile(info, _io.BytesIO(data))
 
     with pytest.raises(ValueError, match="Unsafe blob path"):
-        Workspace.load(snap)
+        _load(snap)
 
 
 # ── copy ───────────────────────────────────────────────────────────
@@ -315,7 +318,7 @@ def test_workspace_copy_preserves_max_drain_bytes():
 def test_to_state_dict_shape():
     ws = Workspace({"/m": (RAMResource(), MountMode.WRITE)},
                    mode=MountMode.WRITE)
-    state = to_state_dict(ws)
+    state = asyncio.run(to_state_dict(ws))
     assert state["version"] == 2
     assert "mirage_version" in state
     assert isinstance(state["mounts"], list)
@@ -327,7 +330,7 @@ def test_snapshot_round_trip_no_sync_policy(tmp_path):
     ws = Workspace({"/data": RAMResource()})
     target = tmp_path / "snap.tar"
     asyncio.run(ws.snapshot(str(target)))
-    restored = Workspace.load(str(target))
+    restored = _load(str(target))
     assert restored is not None
 
 
@@ -346,7 +349,7 @@ def test_ram_round_trip_filenames_with_spaces(tmp_path):
 
     snap = tmp_path / "spaces.tar"
     asyncio.run(src.snapshot(snap))
-    dst = Workspace.load(snap)
+    dst = _load(snap)
 
     files = dst._registry.mount_for("/m/").resource._store.files
     assert files["/my file.txt"] == b"with spaces"
@@ -370,7 +373,7 @@ def test_disk_round_trip_filenames_with_spaces(tmp_path):
 
     dst_root = tmp_path / "dst"
     dst_root.mkdir()
-    Workspace.load(snap, resources={"/m": DiskResource(root=str(dst_root))})
+    _load(snap, resources={"/m": DiskResource(root=str(dst_root))})
     assert (dst_root / "my file.txt").read_bytes() == b"hello space"
     assert ((dst_root / "dir with space" /
              "data.txt").read_bytes() == b"deep space")
@@ -421,7 +424,7 @@ def test_redis_round_trip_filenames_with_spaces(tmp_path):
     asyncio.run(src.snapshot(snap))
 
     dst_resource = RedisResource(url=redis_url, key_prefix=dst_prefix)
-    Workspace.load(snap, resources={"/m": dst_resource})
+    _load(snap, resources={"/m": dst_resource})
 
     sc = sync_redis.Redis.from_url(redis_url)
     try:

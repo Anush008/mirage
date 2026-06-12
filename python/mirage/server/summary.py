@@ -39,10 +39,10 @@ def _user_mounts(ws: Workspace):
     return [m for m in ws._registry.mounts() if not _is_auto_prefix(m.prefix)]
 
 
-def _build_internals(ws: Workspace) -> WorkspaceInternals:
+async def _build_internals(ws: Workspace) -> WorkspaceInternals:
     cache = ws._cache
     cache_bytes = sum(len(v) for v in cache._store.files.values())
-    history_len = len(ws.history)
+    history_len = len(await ws.history())
     return WorkspaceInternals(
         cache_bytes=cache_bytes,
         cache_entries=len(cache._entries),
@@ -64,8 +64,8 @@ def make_brief(entry: WorkspaceEntry) -> WorkspaceBrief:
     )
 
 
-def make_detail(entry: WorkspaceEntry,
-                verbose: bool = False) -> WorkspaceDetail:
+async def make_detail(entry: WorkspaceEntry,
+                      verbose: bool = False) -> WorkspaceDetail:
     ws = entry.runner.ws
     user_mounts = _user_mounts(ws)
     workspace_mode = (user_mounts[0].mode.value if user_mounts else "read")
@@ -87,5 +87,5 @@ def make_detail(entry: WorkspaceEntry,
         created_at=entry.created_at,
         mounts=mounts,
         sessions=sessions,
-        internals=_build_internals(ws) if verbose else None,
+        internals=await _build_internals(ws) if verbose else None,
     )

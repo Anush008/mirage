@@ -152,7 +152,7 @@ def test_snapshot_roundtrip_preserves_tombstones(tmp_path):
     _exec(ws, "pwd")
     snap = tmp_path / "ws.tar"
     asyncio.run(ws.snapshot(snap))
-    dst = Workspace.load(snap)
+    dst = asyncio.run(Workspace.load(snap))
     mine = _stdout(_exec(dst, "history"))
     file_out = _stdout(_exec(dst, "cat /.bash_history"))
     assert "ls /data" not in mine
@@ -160,10 +160,10 @@ def test_snapshot_roundtrip_preserves_tombstones(tmp_path):
     assert "ls /data" in file_out
 
 
-def test_workspace_history_property():
+def test_workspace_history_method():
     ws = _ws()
     _exec(ws, "ls /data")
     _exec(ws, "pwd")
-    events = ws.history
+    events = asyncio.run(ws.history())
     assert [e["command"] for e in events] == ["ls /data", "pwd"]
     assert all(e["type"] == "command" for e in events)

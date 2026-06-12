@@ -35,6 +35,6 @@ async def snapshot(ws, target, *, compress: str | None = None) -> None:
             object (BytesIO, etc.).
         compress: None | "gz" | "bz2" | "xz".
     """
-    state = to_state_dict(ws)
+    state = await to_state_dict(ws)
     manifest, blobs = split_manifest_and_blobs(state)
     write_tar(target, manifest, blobs, compress=compress)

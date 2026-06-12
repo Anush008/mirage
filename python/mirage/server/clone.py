@@ -79,10 +79,10 @@ async def clone_workspace_with_override(src_ws: Workspace,
     Returns:
         Workspace: a new, independent workspace.
     """
-    state = to_state_dict(src_ws)
+    state = await to_state_dict(src_ws)
     override_resources = _build_override_resources(override)
     existing = _existing_redacted_resources(src_ws,
                                             state,
                                             skip=set(override_resources))
     merged = {**existing, **override_resources}
-    return Workspace._from_state(state, resources=merged)
+    return await Workspace._from_state(state, resources=merged)

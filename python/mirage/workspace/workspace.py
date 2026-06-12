@@ -37,13 +37,13 @@ from mirage.io import IOResult
 from mirage.observe.context import start_recording, stop_recording
 from mirage.observe.observer import Observer
 from mirage.observe.record import OpRecord
+from mirage.observe.store import ObserverStore
 from mirage.ops import Ops
 from mirage.ops.open import make_open
 from mirage.ops.os_patch import make_os_module
 from mirage.provision import ProvisionResult
 from mirage.resource.base import BaseResource
 from mirage.resource.history import HISTORY_PREFIX, HistoryViewResource
-from mirage.resource.ram import RAMResource
 from mirage.shell.job_table import JobTable
 from mirage.shell.parse import find_syntax_error, parse
 from mirage.types import (DEFAULT_AGENT_ID, DEFAULT_SESSION_ID,
@@ -89,7 +89,7 @@ class Workspace:
         agent_id: str = DEFAULT_AGENT_ID,
         fuse: bool = False,
         native: bool = False,
-        observe: BaseResource | None = None,
+        observe: ObserverStore | None = None,
     ) -> None:
         self._registry = MountRegistry()
         if isinstance(cache, RedisCacheConfig):
@@ -144,8 +144,7 @@ class Workspace:
         self._fuse = FuseManager()
         self._native = native
 
-        observe_resource = (observe if observe is not None else RAMResource())
-        self.observer = Observer(resource=observe_resource)
+        self.observer = Observer(store=observe)
         self._registry.mount(HISTORY_PREFIX,
                              HistoryViewResource(self.observer),
                              MountMode.READ)
@@ -159,14 +158,13 @@ class Workspace:
         if fuse:
             self._fuse.setup(self)
 
-    @property
-    def history(self) -> list[dict]:
+    async def history(self) -> list[dict]:
         """Command events recorded by the hidden recorder.
 
         Returns:
             list[dict]: All sessions' command events, timestamp order.
         """
-        return self.observer.command_events()
+        return await self.observer.command_events()
 
     @property
     def ops(self) -> Ops:
@@ -329,11 +327,12 @@ class Workspace:
         await _write_snapshot(self, target, compress=compress)
 
     @classmethod
-    def load(cls,
-             source,
-             *,
-             resources: dict | None = None,
-             drift_policy: DriftPolicy = DriftPolicy.STRICT) -> "Workspace":
+    async def load(
+            cls,
+            source,
+            *,
+            resources: dict | None = None,
+            drift_policy: DriftPolicy = DriftPolicy.STRICT) -> "Workspace":
         """Reconstruct a Workspace from a tar.
 
         For every recorded read:
@@ -361,12 +360,12 @@ class Workspace:
                 disables drift checking and evicts snapshot cache for
                 fingerprinted paths.
         """
-        return cls.from_state(read_tar(source),
-                              resources=resources,
-                              drift_policy=drift_policy)
+        return await cls.from_state(read_tar(source),
+                                    resources=resources,
+                                    drift_policy=drift_policy)
 
     @classmethod
-    def from_state(
+    async def from_state(
             cls,
             state: dict,
             *,
@@ -388,7 +387,7 @@ class Workspace:
                 disables drift checking and evicts snapshot cache for
                 fingerprinted paths.
         """
-        ws = cls._from_state(state, resources=resources)
+        ws = await cls._from_state(state, resources=resources)
         install_fingerprints(ws,
                              state.get(StateKey.FINGERPRINTS) or [],
                              drift_policy)
@@ -408,7 +407,7 @@ class Workspace:
         # Only reuse resources whose state has redacted secrets or connection
         # material. Local content resources (RAM, Disk) are reconstructed
         # fresh so the copy's writes don't clobber the original's data.
-        state = to_state_dict(self)
+        state = await to_state_dict(self)
         auto_prefixes = {"/dev/", norm_mount_prefix(HISTORY_PREFIX)}
         prefix_to_resource = {
             m.prefix: m.resource
@@ -419,19 +418,19 @@ class Workspace:
             for m in state["mounts"] if requires_resource_override(m)
             and m["prefix"] in prefix_to_resource
         }
-        return type(self)._from_state(state, resources=resources)
+        return await type(self)._from_state(state, resources=resources)
 
     @classmethod
-    def _from_state(cls,
-                    state: dict,
-                    *,
-                    resources: dict | None = None) -> "Workspace":
+    async def _from_state(cls,
+                          state: dict,
+                          *,
+                          resources: dict | None = None) -> "Workspace":
         args = build_mount_args(state, resources)
         ws = cls(args.mount_args,
                  consistency=args.consistency,
                  session_id=args.default_session_id,
                  agent_id=args.default_agent_id)
-        apply_state_dict(ws, state)
+        await apply_state_dict(ws, state)
         return ws
 
     def __deepcopy__(self, memo) -> "Workspace":

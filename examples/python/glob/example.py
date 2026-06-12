@@ -140,7 +140,7 @@ async def main():
     print("\n=== BASH HISTORY ===\n")
 
     print(f"Total ops: {ops_summary()}")
-    print(f"Commands recorded: {len(ws.history)}")
+    print(f"Commands recorded: {len(await ws.history())}")
 
     r = await ws.execute("tail -n 6 /.bash_history")
     for line in (await r.stdout_str()).strip().splitlines():

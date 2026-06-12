@@ -383,7 +383,7 @@ async def main():
 
     # ── execution history: hidden recorder + GNU views ──
     print("\n=== EXECUTION HISTORY ===\n")
-    events = ws.history
+    events = await ws.history()
     print(f"  Total commands recorded: {len(events)}")
 
     entry = events[-1]
@@ -464,7 +464,7 @@ async def main():
 
     print("\n--- background job history ---")
     bg_entries = [
-        e for e in ws.history
+        e for e in await ws.history()
         if "grep" in e["command"] and "&" not in e["command"]
     ]
     print(f"  Background job records: {len(bg_entries)}")

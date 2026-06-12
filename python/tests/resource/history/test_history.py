@@ -18,14 +18,13 @@ import pytest
 
 from mirage.observe.observer import Observer
 from mirage.resource.history import HistoryViewResource
-from mirage.resource.ram import RAMResource
 from mirage.types import FileType, MountMode
 from mirage.workspace.mount.registry import MountRegistry
 from mirage.workspace.types import ExecutionNode, ExecutionRecord
 
 
 def _observer_with(commands: list[tuple[str, str]]) -> Observer:
-    obs = Observer(resource=RAMResource())
+    obs = Observer()
     for i, (cmd, session) in enumerate(commands):
         rec = ExecutionRecord(
             agent="a",

@@ -13,9 +13,16 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import asyncio
+import os
+import sys
+import uuid
 
 from mirage import MountMode, Workspace
+from mirage.observe.redis_store import RedisObserverStore
+from mirage.observe.store import ObserverStore
 from mirage.resource.ram import RAMResource
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 CASES: list[tuple[str, str, str]] = [
     # ----- seed commands (their outputs are part of the record) -----
@@ -52,8 +59,19 @@ EXIT_CODE_CASES: list[tuple[str, str, str]] = [
 ]
 
 
-async def main() -> None:
-    ws = Workspace({"/data": RAMResource()}, mode=MountMode.WRITE)
+def _make_observe_store(kind: str) -> ObserverStore | None:
+    if kind != "redis":
+        return None
+    return RedisObserverStore(
+        url=REDIS_URL,
+        key_prefix=f"mirage-integ-history-{uuid.uuid4().hex[:8]}:")
+
+
+async def main(observe_kind: str) -> None:
+    observe = _make_observe_store(observe_kind)
+    ws = Workspace({"/data": RAMResource()},
+                   mode=MountMode.WRITE,
+                   observe=observe)
     ws.create_session("s2")
 
     for name, session, cmd in CASES:
@@ -68,12 +86,12 @@ async def main() -> None:
         print(f"nonzero_exit={result.exit_code != 0}")
 
     # ----- observer: the hidden recorder behind the views -----
-    events = ws.observer.events()
+    events = await ws.observer.events()
     types = sorted({e["type"] for e in events})
     print("=== observer_event_types ===")
     print(",".join(types))
 
-    commands = ws.history
+    commands = await ws.history()
     print("=== observer_command_events ===")
     print(f"first={commands[0]['command']}")
     print(f"sessions={sorted({e['session'] for e in commands})}")
@@ -90,15 +108,20 @@ async def main() -> None:
     print(f"ops_have_source={all('source' in e for e in ops)}")
 
     print("=== observer_session_projection ===")
-    s2_events = ws.observer.session_command_events("s2")
-    default_events = ws.observer.session_command_events("default")
+    s2_events = await ws.observer.session_command_events("s2")
+    default_events = await ws.observer.session_command_events("default")
     print(f"s2_after_clear={[e['command'] for e in s2_events]}")
     print(f"default_first={default_events[0]['command']}")
 
     print("=== observer_not_mounted ===")
-    mounted = {m.resource for m in ws._registry.mounts()}
-    print(f"recorder_mounted={ws.observer.resource in mounted}")
+    prefixes = sorted(m.prefix for m in ws._registry.mounts())
+    print(f"mounts={prefixes}")
+    print(
+        f"recorder_mounted="
+        f"{ws.observer.store in [m.resource for m in ws._registry.mounts()]}")
+    if observe is not None:
+        await observe.clear()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(sys.argv[1] if len(sys.argv) > 1 else "ram"))
