@@ -35,6 +35,12 @@ class Observer:
     def __init__(self, resource: BaseResource) -> None:
         self._resource = resource
         self._sessions: set[str] = set()
+        self._seq = 0
+
+    def _next_seq(self) -> int:
+        seq = self._seq
+        self._seq += 1
+        return seq
 
     @property
     def resource(self) -> BaseResource:
@@ -60,6 +66,7 @@ class Observer:
             cwd (str | None): Session cwd at log time.
         """
         entry = LogEntry.from_op_record(rec, agent, session, cwd)
+        entry.seq = self._next_seq()
         self._sessions.add(session)
         line = (entry.to_json_line() + "\n").encode()
         await self._append(f"/{utc_date_folder()}/{session}.jsonl", line)
@@ -72,6 +79,7 @@ class Observer:
             cwd (str | None): Session cwd at log time.
         """
         entry = LogEntry.from_execution_record(rec, cwd)
+        entry.seq = self._next_seq()
         self._sessions.add(rec.session_id)
         line = (entry.to_json_line() + "\n").encode()
         await self._append(f"/{utc_date_folder()}/{rec.session_id}.jsonl",
@@ -89,13 +97,18 @@ class Observer:
             agent=agent,
             session=session,
             timestamp=int(time.time() * 1000),
+            seq=self._next_seq(),
         )
         self._sessions.add(session)
         line = (entry.to_json_line() + "\n").encode()
         await self._append(f"/{utc_date_folder()}/{session}.jsonl", line)
 
     def events(self) -> list[dict]:
-        """All recorded events across sessions, ordered by timestamp.
+        """All recorded events across sessions, in append order.
+
+        Ordered by the monotonic per-recorder seq (total order even
+        when timestamps tie), timestamp as a fallback for events
+        loaded from sources that lack one.
 
         Returns:
             list[dict]: Parsed LogEntry dicts.
@@ -108,7 +121,7 @@ class Observer:
             for line in store.files[key].decode().splitlines():
                 if line:
                     out.append(json.loads(line))
-        out.sort(key=lambda e: e.get("timestamp", 0))
+        out.sort(key=lambda e: (e.get("timestamp", 0), e.get("seq", 0)))
         return out
 
     def command_events(self) -> list[dict]:
@@ -158,10 +171,15 @@ class Observer:
         store = self._resource._store
         day = utc_date_folder()
         by_session: dict[str, list[str]] = {}
-        for e in events:
+        max_seq = self._seq - 1
+        for i, e in enumerate(events):
+            if e.get("seq") is None:
+                e = {**e, "seq": i}
+            max_seq = max(max_seq, e["seq"])
             session = e.get("session", "default")
             by_session.setdefault(session, []).append(
                 json.dumps(e, separators=(",", ":")))
+        self._seq = max_seq + 1
         for session, lines in by_session.items():
             self._sessions.add(session)
             key = f"/{day}/{session}.jsonl"

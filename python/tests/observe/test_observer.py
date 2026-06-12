@@ -123,6 +123,16 @@ def test_command_events_all_sessions_ordered():
     assert all(e["type"] == "command" for e in events)
 
 
+def test_command_events_same_timestamp_keeps_append_order():
+    resource = RAMResource()
+    obs = Observer(resource=resource)
+    asyncio.run(obs.log_command(_command_record("first", "s2", 1.0)))
+    asyncio.run(obs.log_command(_command_record("second", "s1", 1.0)))
+    asyncio.run(obs.log_command(_command_record("third", "s2", 1.0)))
+    events = obs.command_events()
+    assert [e["command"] for e in events] == ["first", "second", "third"]
+
+
 def test_session_command_events_respects_last_clear():
     resource = RAMResource()
     obs = Observer(resource=resource)
