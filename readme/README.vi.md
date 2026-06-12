@@ -29,6 +29,7 @@
   <a href="./README.zh-TW.md"><img alt="繁體中文 README" src="https://img.shields.io/badge/繁體中文-d9d9d9"></a>
   <a href="./README.fr.md"><img alt="README en Français" src="https://img.shields.io/badge/Français-d9d9d9"></a>
   <a href="./README.vi.md"><img alt="README Tiếng Việt" src="https://img.shields.io/badge/Ti%E1%BA%BFng%20Vi%E1%BB%87t-d9d9d9"></a>
+  <a href="./README.ko.md"><img alt="README 한국어" src="https://img.shields.io/badge/%ED%95%9C%EA%B5%AD%EC%96%B4-d9d9d9"></a>
 </p>
 
 Mirage là **hệ thống tệp ảo thống nhất cho AI Agent**: nó gắn các dịch vụ và nguồn dữ liệu như S3, Google Drive, Slack, Gmail và Redis cạnh nhau thành một hệ thống tệp duy nhất. Bất kỳ LLM nào đã biết bash đều có thể đọc, grep và nối pipe trên mọi backend ngay từ đầu, không cần từ vựng mới.

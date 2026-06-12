@@ -29,6 +29,7 @@
   <a href="./README.zh-TW.md"><img alt="繁體中文 README" src="https://img.shields.io/badge/繁體中文-d9d9d9"></a>
   <a href="./README.fr.md"><img alt="README en Français" src="https://img.shields.io/badge/Français-d9d9d9"></a>
   <a href="./README.vi.md"><img alt="README Tiếng Việt" src="https://img.shields.io/badge/Ti%E1%BA%BFng%20Vi%E1%BB%87t-d9d9d9"></a>
+  <a href="./README.ko.md"><img alt="README 한국어" src="https://img.shields.io/badge/%ED%95%9C%EA%B5%AD%EC%96%B4-d9d9d9"></a>
 </p>
 
 Mirage 是 **面向 AI Agent 的统一虚拟文件系统**：它把 S3、Google Drive、Slack、Gmail、Redis 等服务和数据源并排挂载为同一个文件系统。任何已经会用 bash 的 LLM 都可以开箱即用地对每个后端进行读取、grep 和管道操作，不需要学习新的词汇。
