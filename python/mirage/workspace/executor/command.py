@@ -136,8 +136,8 @@ def _parse_flags(
         parsed = parse_command(spec, argv, cwd=cwd)
         flag_kwargs = parse_to_kwargs(parsed)
 
-        # Recover PathSpec for PATH flag values; repeatable PATH flags carry
-        # newline-joined resolved paths and become a list of PathSpec.
+        # Recover PathSpec for PATH flag values; repeatable PATH flags
+        # arrive as a list of resolved paths and become list[PathSpec].
         repeat_path_keys = {
             flag_kwarg_name(name)
             for opt in spec.options
@@ -145,17 +145,15 @@ def _parse_flags(
             for name in (opt.short, opt.long) if name
         }
         for key, value in flag_kwargs.items():
-            if not isinstance(value, str):
-                continue
-            if key in repeat_path_keys and "\n" in value:
+            if key in repeat_path_keys and isinstance(value, list):
                 flag_kwargs[key] = [
                     scope_map.get(
                         part,
                         PathSpec(original=part,
                                  directory=part[:part.rfind("/") + 1] or "/",
-                                 resolved=True)) for part in value.split("\n")
+                                 resolved=True)) for part in value
                 ]
-            elif value in scope_map:
+            elif isinstance(value, str) and value in scope_map:
                 flag_kwargs[key] = scope_map[value]
 
         # Classify positional args

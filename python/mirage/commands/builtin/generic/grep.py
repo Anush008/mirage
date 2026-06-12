@@ -6,7 +6,8 @@ from mirage.cache.index import IndexCacheStore
 from mirage.commands.builtin.grep_helper import (NEVER_MATCH, compile_pattern,
                                                  grep_files_only, grep_lines,
                                                  grep_recursive, grep_stream,
-                                                 merge_pattern_list)
+                                                 merge_pattern_list,
+                                                 pattern_arg)
 from mirage.commands.builtin.utils.lines import split_lines
 from mirage.commands.builtin.utils.output import (format_optional_records,
                                                   format_records)
@@ -46,14 +47,7 @@ async def resolve_pattern(
             never_match is True when -f supplied zero patterns (GNU: match
             nothing; -F escaping must be skipped for the sentinel).
     """
-    e = flags.get("e")
-    pattern: str | None
-    if isinstance(e, str):
-        pattern = e
-    elif texts:
-        pattern = texts[0]
-    else:
-        pattern = None
+    pattern = pattern_arg(texts, flags)
 
     pattern_file = flags.get("f")
     if isinstance(pattern_file, (PathSpec, list)):

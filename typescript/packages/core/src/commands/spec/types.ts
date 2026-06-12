@@ -108,7 +108,7 @@ export class CommandSpec {
 }
 
 export interface ParsedArgsInit {
-  flags: Record<string, string | boolean>
+  flags: Record<string, string | boolean | string[]>
   args: [string, OperandKind][]
   cachePaths?: string[]
   pathFlagValues?: string[]
@@ -118,7 +118,7 @@ export interface ParsedArgsInit {
 }
 
 export class ParsedArgs {
-  readonly flags: Record<string, string | boolean>
+  readonly flags: Record<string, string | boolean | string[]>
   readonly args: [string, OperandKind][]
   readonly cachePaths: string[]
   readonly pathFlagValues: string[]
@@ -148,7 +148,10 @@ export class ParsedArgs {
     return this.args.filter(([, k]) => k === OperandKind.TEXT).map(([v]) => v)
   }
 
-  flag(name: string, fallback: string | boolean | null = null): string | boolean | null {
+  flag(
+    name: string,
+    fallback: string | boolean | string[] | null = null,
+  ): string | boolean | string[] | null {
     return this.flags[name] ?? fallback
   }
 }

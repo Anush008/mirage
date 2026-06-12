@@ -23,14 +23,18 @@ export function resolvePath(cwd: string, path: string): string {
 }
 
 function setValueFlag(
-  flags: Record<string, string | boolean>,
+  flags: Record<string, string | boolean | string[]>,
   name: string,
   value: string,
   repeatFlags: ReadonlySet<string>,
 ): void {
-  const prev = flags[name]
-  if (repeatFlags.has(name) && typeof prev === 'string') {
-    flags[name] = `${prev}\n${value}`
+  if (repeatFlags.has(name)) {
+    const prev = flags[name]
+    if (Array.isArray(prev)) {
+      prev.push(value)
+    } else {
+      flags[name] = [value]
+    }
   } else {
     flags[name] = value
   }
@@ -120,7 +124,7 @@ export function parseCommand(spec: CommandSpec, argv: string[], cwd: string): Pa
     }
   }
 
-  const flags: Record<string, string | boolean> = {}
+  const flags: Record<string, string | boolean | string[]> = {}
   const rawArgs: string[] = []
   const warnings: string[] = []
   // Free-text commands (echo/python/bash-style TEXT rest) keep unknown dash
@@ -266,27 +270,27 @@ export function parseCommand(spec: CommandSpec, argv: string[], cwd: string): Pa
 
   const pathFlagValues: string[] = []
   for (const [flagName, kind] of valueFlagKinds) {
-    if (kind === OperandKind.PATH && flagName in flags) {
-      const val = flags[flagName]
-      if (typeof val === 'string') {
-        if (repeatFlags.has(flagName) && val.includes('\n')) {
-          const parts = val.split('\n').map((part) => resolvePath(cwd, part))
-          flags[flagName] = parts.join('\n')
-          pathFlagValues.push(...parts)
-        } else {
-          const resolved = resolvePath(cwd, val)
-          flags[flagName] = resolved
-          pathFlagValues.push(resolved)
-        }
-      }
+    if (kind !== OperandKind.PATH || !(flagName in flags)) continue
+    const val = flags[flagName]
+    if (Array.isArray(val)) {
+      const resolvedList = val.map((part) => resolvePath(cwd, part))
+      flags[flagName] = resolvedList
+      pathFlagValues.push(...resolvedList)
+    } else if (typeof val === 'string') {
+      const resolved = resolvePath(cwd, val)
+      flags[flagName] = resolved
+      pathFlagValues.push(resolved)
     }
   }
 
   const textFlagValues: string[] = []
   for (const [flagName, kind] of valueFlagKinds) {
-    if (kind === OperandKind.TEXT && flagName in flags) {
-      const val = flags[flagName]
-      if (typeof val === 'string') textFlagValues.push(...val.split('\n'))
+    if (kind !== OperandKind.TEXT || !(flagName in flags)) continue
+    const val = flags[flagName]
+    if (Array.isArray(val)) {
+      textFlagValues.push(...val)
+    } else if (typeof val === 'string') {
+      textFlagValues.push(val)
     }
   }
 
@@ -301,8 +305,8 @@ export function parseCommand(spec: CommandSpec, argv: string[], cwd: string): Pa
   })
 }
 
-export function parseToKwargs(parsed: ParsedArgs): Record<string, string | boolean> {
-  const result: Record<string, string | boolean> = {}
+export function parseToKwargs(parsed: ParsedArgs): Record<string, string | boolean | string[]> {
+  const result: Record<string, string | boolean | string[]> = {}
   for (const [key, value] of Object.entries(parsed.flags)) {
     let clean = key.replace(/^-+/, '').replaceAll('-', '_')
     clean = AMBIGUOUS_NAMES[clean] ?? clean

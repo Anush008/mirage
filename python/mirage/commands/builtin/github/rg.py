@@ -18,7 +18,7 @@ from mirage.accessor.github import GitHubAccessor
 from mirage.cache.index import IndexCacheStore
 from mirage.commands.builtin.constants import PatternType
 from mirage.commands.builtin.generic.rg import rg as generic_rg
-from mirage.commands.builtin.grep_helper import classify_pattern
+from mirage.commands.builtin.grep_helper import classify_pattern, pattern_arg
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
 from mirage.core.github.constants import SCOPE_ERROR, SCOPE_WARN
@@ -42,10 +42,9 @@ async def rg(
     index: IndexCacheStore = None,
     **flags: object,
 ) -> tuple[ByteSource | None, IOResult]:
-    e = flags.get("e")
-    if not isinstance(e, str) and not texts:
+    pattern_str = pattern_arg(texts, flags)
+    if pattern_str is None:
         raise ValueError("rg: usage: rg [flags] pattern [path]")
-    pattern_str = e if isinstance(e, str) else texts[0]
 
     if paths and index is None:
         return b"", IOResult(exit_code=1)

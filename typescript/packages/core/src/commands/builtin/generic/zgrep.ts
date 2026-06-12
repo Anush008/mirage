@@ -16,7 +16,7 @@ import { IOResult, materialize, type ByteSource } from '../../../io/types.ts'
 import { PathSpec } from '../../../types.ts'
 import { gunzip } from '../../../utils/compress.ts'
 import type { CommandFnResult, CommandOpts } from '../../config.ts'
-import { NEVER_MATCH, compilePattern, mergePatternList } from '../grep_helper.ts'
+import { NEVER_MATCH, compilePattern, mergePatternList, patternArg } from '../grep_helper.ts'
 import { readStdinAsync } from '../utils/stream.ts'
 
 const ENC = new TextEncoder()
@@ -88,13 +88,12 @@ export async function zgrepGeneric(
   opts: CommandOpts,
   stream: (p: PathSpec) => AsyncIterable<Uint8Array>,
 ): Promise<CommandFnResult> {
-  let rawPattern: string | null =
-    typeof opts.flags.e === 'string' ? opts.flags.e : (texts[0] ?? null)
+  let rawPattern: string | null = patternArg(texts, opts.flags)
   let neverMatch = false
-  if (typeof opts.flags.f === 'string') {
-    // Repeatable -f carries newline-joined resolved paths; pattern files are
+  if (Array.isArray(opts.flags.f)) {
+    // Repeatable -f arrives as a list of resolved paths; pattern files are
     // plain text even though the search targets are gzipped.
-    for (const filePath of opts.flags.f.split('\n')) {
+    for (const filePath of opts.flags.f) {
       const patternSpec = PathSpec.fromStrPath(filePath, paths[0]?.prefix ?? opts.mountPrefix ?? '')
       let fileData: Uint8Array
       try {

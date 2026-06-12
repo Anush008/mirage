@@ -16,7 +16,13 @@ import { exitOnEmpty } from '../../../io/stream.ts'
 import { IOResult, materialize, type ByteSource } from '../../../io/types.ts'
 import { FileType, PathSpec, type FileStat } from '../../../types.ts'
 import type { CommandFnResult, CommandOpts } from '../../config.ts'
-import { NEVER_MATCH, compilePattern, grepStream, mergePatternList } from '../grep_helper.ts'
+import {
+  NEVER_MATCH,
+  compilePattern,
+  grepStream,
+  mergePatternList,
+  patternArg,
+} from '../grep_helper.ts'
 import { rgFolderFiletype, rgFull } from '../rg_helper.ts'
 import { resolveSource } from '../utils/stream.ts'
 import { grepGeneric } from './grep.ts'
@@ -50,8 +56,8 @@ interface RgFlags {
   hidden: boolean
 }
 
-function parseRgFlags(flags: Record<string, string | boolean>): RgFlags {
-  const toInt = (v: string | boolean | undefined): number | null =>
+function parseRgFlags(flags: Record<string, string | boolean | string[]>): RgFlags {
+  const toInt = (v: string | boolean | string[] | undefined): number | null =>
     typeof v === 'string' ? Number.parseInt(v, 10) : null
   const a = toInt(flags.A)
   const b = toInt(flags.B)
@@ -87,11 +93,11 @@ export async function rgGeneric(
   stream: Stream,
   scopeCheck?: ScopeCheck,
 ): Promise<CommandFnResult> {
-  let exprText: string | undefined = typeof opts.flags.e === 'string' ? opts.flags.e : texts[0]
+  let exprText: string | undefined = patternArg(texts, opts.flags) ?? undefined
   let neverMatch = false
-  if (typeof opts.flags.f === 'string') {
-    // Repeatable -f carries newline-joined resolved paths; read each file.
-    for (const filePath of opts.flags.f.split('\n')) {
+  if (Array.isArray(opts.flags.f)) {
+    // Repeatable -f arrives as a list of resolved paths; read each file.
+    for (const filePath of opts.flags.f) {
       const patternSpec = PathSpec.fromStrPath(filePath, paths[0]?.prefix ?? opts.mountPrefix ?? '')
       let fileData: Uint8Array
       try {

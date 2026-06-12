@@ -28,14 +28,17 @@ def _resolve(cwd: str, path: str) -> str:
 
 
 def _set_value_flag(
-    flags: dict[str, str | bool],
+    flags: dict[str, str | bool | list[str]],
     name: str,
     value: str,
     repeat_flags: set[str],
 ) -> None:
-    prev = flags.get(name)
-    if name in repeat_flags and isinstance(prev, str):
-        flags[name] = f"{prev}\n{value}"
+    if name in repeat_flags:
+        prev = flags.get(name)
+        if isinstance(prev, list):
+            prev.append(value)
+        else:
+            flags[name] = [value]
     else:
         flags[name] = value
 
@@ -120,7 +123,7 @@ def parse_command(
             filtered_argv.append(argv[i])
             i += 1
 
-    flags: dict[str, str | bool] = {}
+    flags: dict[str, str | bool | list[str]] = {}
     raw_args: list[str] = []
     warnings: list[str] = []
     # Free-text commands (echo/python/bash-style TEXT rest) keep unknown
@@ -250,23 +253,27 @@ def parse_command(
 
     path_flag_values: list[str] = []
     for flag_name, kind in value_flag_kinds.items():
-        if (kind == OperandKind.PATH and flag_name in flags
-                and isinstance(flags[flag_name], str)):
-            value = flags[flag_name]
-            if flag_name in repeat_flags and "\n" in value:
-                parts = [_resolve(cwd, part) for part in value.split("\n")]
-                flags[flag_name] = "\n".join(parts)
-                path_flag_values.extend(parts)
-            else:
-                resolved = _resolve(cwd, value)
-                flags[flag_name] = resolved
-                path_flag_values.append(resolved)
+        if kind != OperandKind.PATH or flag_name not in flags:
+            continue
+        value = flags[flag_name]
+        if isinstance(value, list):
+            resolved_list = [_resolve(cwd, part) for part in value]
+            flags[flag_name] = resolved_list
+            path_flag_values.extend(resolved_list)
+        elif isinstance(value, str):
+            resolved = _resolve(cwd, value)
+            flags[flag_name] = resolved
+            path_flag_values.append(resolved)
 
     text_flag_values: list[str] = []
     for flag_name, kind in value_flag_kinds.items():
-        if (kind == OperandKind.TEXT and flag_name in flags
-                and isinstance(flags[flag_name], str)):
-            text_flag_values.extend(flags[flag_name].split("\n"))
+        if kind != OperandKind.TEXT or flag_name not in flags:
+            continue
+        value = flags[flag_name]
+        if isinstance(value, list):
+            text_flag_values.extend(value)
+        elif isinstance(value, str):
+            text_flag_values.append(value)
 
     return ParsedArgs(
         flags=flags,
@@ -284,8 +291,8 @@ def flag_kwarg_name(flag: str) -> str:
     return AMBIGUOUS_NAMES.get(clean, clean)
 
 
-def parse_to_kwargs(parsed: ParsedArgs) -> dict[str, str | bool]:
-    result: dict[str, str | bool] = {}
+def parse_to_kwargs(parsed: ParsedArgs) -> dict[str, str | bool | list[str]]:
+    result: dict[str, str | bool | list[str]] = {}
     for key, value in parsed.flags.items():
         result[flag_kwarg_name(key)] = value
     return result

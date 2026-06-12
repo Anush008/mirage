@@ -26,7 +26,7 @@ def test_grep_positional_pattern_then_path():
 
 def test_grep_dash_e_frees_positional_slot_for_path():
     parsed = parse_command(SPECS["grep"], ["-e", "orange", "/data/a.txt"], "/")
-    assert parsed.flags["-e"] == "orange"
+    assert parsed.flags["-e"] == ["orange"]
     assert parsed.texts() == []
     assert parsed.paths() == ["/data/a.txt"]
 
@@ -35,7 +35,7 @@ def test_grep_dash_e_with_flags_and_multiple_paths():
     parsed = parse_command(SPECS["grep"],
                            ["-n", "-e", "pat", "/a.txt", "/b.txt"], "/")
     assert parsed.flags["-n"] is True
-    assert parsed.flags["-e"] == "pat"
+    assert parsed.flags["-e"] == ["pat"]
     assert parsed.paths() == ["/a.txt", "/b.txt"]
 
 
@@ -47,7 +47,7 @@ def test_grep_dash_e_without_path_leaves_args_empty():
 
 def test_zgrep_dash_e_frees_positional_slot_for_path():
     parsed = parse_command(SPECS["zgrep"], ["-e", "orange", "/data/a.gz"], "/")
-    assert parsed.flags["-e"] == "orange"
+    assert parsed.flags["-e"] == ["orange"]
     assert parsed.texts() == []
     assert parsed.paths() == ["/data/a.gz"]
 
@@ -55,7 +55,7 @@ def test_zgrep_dash_e_frees_positional_slot_for_path():
 def test_grep_repeated_dash_e_accumulates_newline_joined():
     parsed = parse_command(SPECS["grep"], ["-e", "foo", "-e", "bar", "/a.txt"],
                            "/")
-    assert parsed.flags["-e"] == "foo\nbar"
+    assert parsed.flags["-e"] == ["foo", "bar"]
     assert parsed.texts() == []
     assert parsed.paths() == ["/a.txt"]
 
@@ -63,7 +63,7 @@ def test_grep_repeated_dash_e_accumulates_newline_joined():
 def test_grep_repeated_dash_e_attached_value_accumulates():
     parsed = parse_command(SPECS["grep"], ["-e", "foo", "-ebar", "/a.txt"],
                            "/")
-    assert parsed.flags["-e"] == "foo\nbar"
+    assert parsed.flags["-e"] == ["foo", "bar"]
     assert parsed.paths() == ["/a.txt"]
 
 
@@ -87,7 +87,7 @@ def test_provided_by_only_skips_slot_when_flag_present():
 
 def test_grep_dash_f_frees_positional_and_routes_pattern_file():
     parsed = parse_command(SPECS["grep"], ["-f", "pats.txt", "a.txt"], "/data")
-    assert parsed.flags["-f"] == "/data/pats.txt"
+    assert parsed.flags["-f"] == ["/data/pats.txt"]
     assert parsed.texts() == []
     assert parsed.paths() == ["/data/a.txt"]
     assert "/data/pats.txt" in parsed.routing_paths()
@@ -96,15 +96,15 @@ def test_grep_dash_f_frees_positional_and_routes_pattern_file():
 def test_grep_dash_e_and_dash_f_together():
     parsed = parse_command(SPECS["grep"],
                            ["-e", "foo", "-f", "/p.txt", "/a.txt"], "/")
-    assert parsed.flags["-e"] == "foo"
-    assert parsed.flags["-f"] == "/p.txt"
+    assert parsed.flags["-e"] == ["foo"]
+    assert parsed.flags["-f"] == ["/p.txt"]
     assert parsed.paths() == ["/a.txt"]
 
 
 def test_grep_repeated_dash_f_accumulates_and_routes_each_file():
     parsed = parse_command(SPECS["grep"],
                            ["-f", "p1.txt", "-f", "p2.txt", "a.txt"], "/data")
-    assert parsed.flags["-f"] == "/data/p1.txt\n/data/p2.txt"
+    assert parsed.flags["-f"] == ["/data/p1.txt", "/data/p2.txt"]
     assert parsed.paths() == ["/data/a.txt"]
     assert "/data/p1.txt" in parsed.routing_paths()
     assert "/data/p2.txt" in parsed.routing_paths()
@@ -112,7 +112,7 @@ def test_grep_repeated_dash_f_accumulates_and_routes_each_file():
 
 def test_rg_dash_e_frees_positional_and_accumulates():
     parsed = parse_command(SPECS["rg"], ["-e", "foo", "-e", "bar", "/x"], "/")
-    assert parsed.flags["-e"] == "foo\nbar"
+    assert parsed.flags["-e"] == ["foo", "bar"]
     assert parsed.texts() == []
     assert parsed.paths() == ["/x"]
 
@@ -142,7 +142,7 @@ def test_unknown_long_flag_dropped_with_warning():
 def test_cluster_ending_in_value_flag_consumes_next_arg():
     parsed = parse_command(SPECS["grep"], ["-ne", "pat", "/a.txt"], "/")
     assert parsed.flags["-n"] is True
-    assert parsed.flags["-e"] == "pat"
+    assert parsed.flags["-e"] == ["pat"]
     assert parsed.texts() == []
     assert parsed.paths() == ["/a.txt"]
 
@@ -150,7 +150,7 @@ def test_cluster_ending_in_value_flag_consumes_next_arg():
 def test_cluster_ending_in_value_flag_with_attached_value():
     parsed = parse_command(SPECS["grep"], ["-nepat", "/a.txt"], "/")
     assert parsed.flags["-n"] is True
-    assert parsed.flags["-e"] == "pat"
+    assert parsed.flags["-e"] == ["pat"]
     assert parsed.paths() == ["/a.txt"]
 
 
@@ -203,7 +203,7 @@ def test_cluster_into_repeatable_flag_accumulates():
     parsed = parse_command(SPECS["grep"],
                            ["-ne", "foo", "-e", "bar", "/a.txt"], "/")
     assert parsed.flags["-n"] is True
-    assert parsed.flags["-e"] == "foo\nbar"
+    assert parsed.flags["-e"] == ["foo", "bar"]
     assert parsed.paths() == ["/a.txt"]
 
 
@@ -215,5 +215,5 @@ def test_long_equals_and_separate_repeatable_accumulate():
         rest=Operand(kind=OperandKind.PATH),
     )
     parsed = parse_command(spec, ["--tag=a", "--tag", "b", "/x"], "/")
-    assert parsed.flags["--tag"] == "a\nb"
+    assert parsed.flags["--tag"] == ["a", "b"]
     assert parsed.paths() == ["/x"]

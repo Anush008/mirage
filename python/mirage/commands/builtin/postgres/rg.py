@@ -17,6 +17,7 @@ from collections.abc import AsyncIterator
 from mirage.accessor.postgres import PostgresAccessor
 from mirage.cache.index import IndexCacheStore
 from mirage.commands.builtin.generic.rg import rg as generic_rg
+from mirage.commands.builtin.grep_helper import pattern_arg
 from mirage.commands.builtin.utils.output import format_records
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
@@ -42,10 +43,9 @@ async def rg(
     index: IndexCacheStore = None,
     **flags: object,
 ) -> tuple[ByteSource | None, IOResult]:
-    e = flags.get("e")
-    if not isinstance(e, str) and not texts:
+    pattern_str = pattern_arg(texts, flags)
+    if pattern_str is None:
         raise ValueError("rg: usage: rg [flags] pattern [path]")
-    pattern_str = e if isinstance(e, str) else texts[0]
 
     config = accessor.config
     limit = config.default_search_limit

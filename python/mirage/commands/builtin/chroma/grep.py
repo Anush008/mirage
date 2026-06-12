@@ -1,6 +1,7 @@
 from functools import partial
 
 from mirage.commands.builtin.generic.grep import grep as generic_grep
+from mirage.commands.builtin.grep_helper import pattern_arg
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
 from mirage.core.chroma.glob import resolve_glob
@@ -21,8 +22,7 @@ async def grep(
 ) -> tuple[ByteSource | None, IOResult]:
     index = flags.get("index")
     paths = await resolve_glob(accessor, paths, index)
-    e = flags.get("e")
-    pattern = e if isinstance(e, str) else (texts[0] if texts else None)
+    pattern = pattern_arg(texts, flags)
     files = paths
     show_filename = False
     if paths and pattern is not None:

@@ -20,7 +20,7 @@ from mirage.cache.index import IndexCacheStore
 from mirage.commands.builtin.generic.rg import rg as generic_rg
 from mirage.commands.builtin.grep_helper import (compile_pattern,
                                                  grep_count_has_matches,
-                                                 grep_lines)
+                                                 grep_lines, pattern_arg)
 from mirage.commands.builtin.utils.output import format_records
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
@@ -44,10 +44,9 @@ async def rg(
     index: IndexCacheStore = None,
     **flags: object,
 ) -> tuple[ByteSource | None, IOResult]:
-    e = flags.get("e")
-    if not isinstance(e, str) and not texts:
+    pattern_str = pattern_arg(texts, flags)
+    if pattern_str is None:
         raise ValueError("rg: usage: rg [flags] pattern [path]")
-    pattern_str = e if isinstance(e, str) else texts[0]
     i = flags.get("i") is True
     v = flags.get("v") is True
     n = flags.get("n") is True

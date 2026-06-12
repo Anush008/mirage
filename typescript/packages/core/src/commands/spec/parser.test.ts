@@ -250,14 +250,14 @@ describe('parseCommand — providedBy frees the positional slot', () => {
 
   it('fixes `grep -e pat file` with the real builtin spec', () => {
     const p = parseCommand(specOf('grep'), ['-e', 'orange', '/data/a.txt'], '/')
-    expect(p.flags['-e']).toBe('orange')
+    expect(p.flags['-e']).toEqual(['orange'])
     expect(p.texts()).toEqual([])
     expect(p.paths()).toEqual(['/data/a.txt'])
   })
 
   it('fixes `zgrep -e pat file` with the real builtin spec', () => {
     const p = parseCommand(specOf('zgrep'), ['-e', 'orange', '/data/a.gz'], '/')
-    expect(p.flags['-e']).toBe('orange')
+    expect(p.flags['-e']).toEqual(['orange'])
     expect(p.texts()).toEqual([])
     expect(p.paths()).toEqual(['/data/a.gz'])
   })
@@ -268,14 +268,14 @@ describe('parseCommand — repeatable value flags accumulate newline-joined', ()
   // newline-separated pattern list, so repeats join with \n.
   it('accumulates repeated -e for grep', () => {
     const p = parseCommand(specOf('grep'), ['-e', 'foo', '-e', 'bar', '/a.txt'], '/')
-    expect(p.flags['-e']).toBe('foo\nbar')
+    expect(p.flags['-e']).toEqual(['foo', 'bar'])
     expect(p.texts()).toEqual([])
     expect(p.paths()).toEqual(['/a.txt'])
   })
 
   it('accumulates attached-value repeats', () => {
     const p = parseCommand(specOf('grep'), ['-e', 'foo', '-ebar', '/a.txt'], '/')
-    expect(p.flags['-e']).toBe('foo\nbar')
+    expect(p.flags['-e']).toEqual(['foo', 'bar'])
   })
 
   it('non-repeatable value flags keep the last value', () => {
@@ -286,7 +286,7 @@ describe('parseCommand — repeatable value flags accumulate newline-joined', ()
   it('cluster into a repeatable flag accumulates', () => {
     const p = parseCommand(specOf('grep'), ['-ne', 'foo', '-e', 'bar', '/a.txt'], '/')
     expect(p.flags['-n']).toBe(true)
-    expect(p.flags['-e']).toBe('foo\nbar')
+    expect(p.flags['-e']).toEqual(['foo', 'bar'])
     expect(p.paths()).toEqual(['/a.txt'])
   })
 
@@ -296,13 +296,13 @@ describe('parseCommand — repeatable value flags accumulate newline-joined', ()
       rest: new Operand({ kind: OperandKind.PATH }),
     })
     const p = parseCommand(spec, ['--tag=a', '--tag', 'b', '/x'], '/')
-    expect(p.flags['--tag']).toBe('a\nb')
+    expect(p.flags['--tag']).toEqual(['a', 'b'])
     expect(p.paths()).toEqual(['/x'])
   })
 
   it('accumulates repeated -e for rg and frees the positional slot', () => {
     const p = parseCommand(specOf('rg'), ['-e', 'foo', '-e', 'bar', '/x'], '/')
-    expect(p.flags['-e']).toBe('foo\nbar')
+    expect(p.flags['-e']).toEqual(['foo', 'bar'])
     expect(p.texts()).toEqual([])
     expect(p.paths()).toEqual(['/x'])
   })
@@ -311,7 +311,7 @@ describe('parseCommand — repeatable value flags accumulate newline-joined', ()
 describe('parseCommand — grep -f pattern file', () => {
   it('frees the positional slot and routes the pattern file', () => {
     const p = parseCommand(specOf('grep'), ['-f', 'pats.txt', 'a.txt'], '/data')
-    expect(p.flags['-f']).toBe('/data/pats.txt')
+    expect(p.flags['-f']).toEqual(['/data/pats.txt'])
     expect(p.texts()).toEqual([])
     expect(p.paths()).toEqual(['/data/a.txt'])
     expect(p.routingPaths()).toContain('/data/pats.txt')
@@ -319,14 +319,14 @@ describe('parseCommand — grep -f pattern file', () => {
 
   it('keeps -e and -f together', () => {
     const p = parseCommand(specOf('grep'), ['-e', 'foo', '-f', '/p.txt', '/a.txt'], '/')
-    expect(p.flags['-e']).toBe('foo')
-    expect(p.flags['-f']).toBe('/p.txt')
+    expect(p.flags['-e']).toEqual(['foo'])
+    expect(p.flags['-f']).toEqual(['/p.txt'])
     expect(p.paths()).toEqual(['/a.txt'])
   })
 
   it('repeated -f accumulates and routes each file', () => {
     const p = parseCommand(specOf('grep'), ['-f', 'p1.txt', '-f', 'p2.txt', 'a.txt'], '/data')
-    expect(p.flags['-f']).toBe('/data/p1.txt\n/data/p2.txt')
+    expect(p.flags['-f']).toEqual(['/data/p1.txt', '/data/p2.txt'])
     expect(p.paths()).toEqual(['/data/a.txt'])
     expect(p.routingPaths()).toContain('/data/p1.txt')
     expect(p.routingPaths()).toContain('/data/p2.txt')
@@ -386,7 +386,7 @@ describe('parseCommand — clusters ending in a value flag (getopt)', () => {
   it('-ne pat: bools then value flag consuming the next arg', () => {
     const p = parseCommand(specOf('grep'), ['-ne', 'pat', '/a.txt'], '/')
     expect(p.flags['-n']).toBe(true)
-    expect(p.flags['-e']).toBe('pat')
+    expect(p.flags['-e']).toEqual(['pat'])
     expect(p.texts()).toEqual([])
     expect(p.paths()).toEqual(['/a.txt'])
   })
@@ -394,7 +394,7 @@ describe('parseCommand — clusters ending in a value flag (getopt)', () => {
   it('-nepat: bools then value flag with attached value', () => {
     const p = parseCommand(specOf('grep'), ['-nepat', '/a.txt'], '/')
     expect(p.flags['-n']).toBe(true)
-    expect(p.flags['-e']).toBe('pat')
+    expect(p.flags['-e']).toEqual(['pat'])
     expect(p.paths()).toEqual(['/a.txt'])
   })
 

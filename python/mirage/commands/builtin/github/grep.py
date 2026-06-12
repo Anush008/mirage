@@ -18,7 +18,7 @@ from mirage.accessor.github import GitHubAccessor
 from mirage.cache.index import IndexCacheStore
 from mirage.commands.builtin.constants import PatternType
 from mirage.commands.builtin.generic.grep import grep as generic_grep
-from mirage.commands.builtin.grep_helper import classify_pattern
+from mirage.commands.builtin.grep_helper import classify_pattern, pattern_arg
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
 from mirage.core.github.constants import SCOPE_ERROR, SCOPE_WARN
@@ -98,8 +98,7 @@ async def grep(
     index: IndexCacheStore = None,
     **flags: object,
 ) -> tuple[ByteSource | None, IOResult]:
-    e = flags.get("e")
-    pattern = e if isinstance(e, str) else (texts[0] if texts else None)
+    pattern = pattern_arg(texts, flags)
     recursive = flags.get("r") is True or flags.get("R") is True
 
     resolved: list[PathSpec] = []

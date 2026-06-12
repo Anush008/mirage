@@ -35,10 +35,10 @@ class Option:
             dispatch, and reach the command as PathSpec.
         numeric_shorthand (bool): treat "-<digits>" as this flag's value
             (e.g. head -5).
-        repeatable (bool): repeated occurrences accumulate newline-joined
-            instead of last-wins (POSIX pattern-list form, e.g. grep -e).
-            Repeatable PATH flags resolve and route each joined path and
-            reach the command as list[PathSpec] when repeated.
+        repeatable (bool): repeated occurrences accumulate into a list
+            instead of last-wins (argparse append semantics, e.g. grep -e).
+            TEXT values arrive as list[str]; PATH values are each resolved
+            and routed and arrive as list[PathSpec].
         description (str | None): help text.
     """
     short: str | None = None
@@ -75,7 +75,7 @@ class CommandSpec:
 
 @dataclass
 class ParsedArgs:
-    flags: dict[str, str | bool]
+    flags: dict[str, str | bool | list[str]]
     args: list[tuple[str, OperandKind]]
     cache_paths: list[str] = field(default_factory=list)
     path_flag_values: list[str] = field(default_factory=list)

@@ -17,6 +17,7 @@ from collections.abc import AsyncIterator
 from mirage.accessor.notion import NotionAccessor
 from mirage.cache.index import IndexCacheStore
 from mirage.commands.builtin.generic.grep import grep as generic_grep
+from mirage.commands.builtin.grep_helper import pattern_arg
 from mirage.commands.builtin.notion._provision import file_read_provision
 from mirage.commands.builtin.utils.output import format_records
 from mirage.commands.registry import command
@@ -55,8 +56,7 @@ async def grep(
     index: IndexCacheStore = None,
     **flags: object,
 ) -> tuple[ByteSource | None, IOResult]:
-    e = flags.get("e")
-    pattern = e if isinstance(e, str) else (texts[0] if texts else None)
+    pattern = pattern_arg(texts, flags)
     m = flags.get("m")
     max_count = int(m) if isinstance(m, str) else None
 

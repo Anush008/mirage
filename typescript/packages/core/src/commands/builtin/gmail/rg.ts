@@ -22,6 +22,7 @@ import { detectScope } from '../../../core/gmail/scope.ts'
 import { formatGrepResults, searchMessages } from '../../../core/gmail/search.ts'
 import { IOResult, type ByteSource } from '../../../io/types.ts'
 import { type FileStat, type PathSpec, ResourceName } from '../../../types.ts'
+import { patternArg } from '../grep_helper.ts'
 import { command, type CommandFnResult, type CommandOpts } from '../../config.ts'
 import { specOf } from '../../spec/builtins.ts'
 import { rgGeneric } from '../generic/rg.ts'
@@ -42,7 +43,7 @@ async function rgCommand(
   texts: string[],
   opts: CommandOpts,
 ): Promise<CommandFnResult> {
-  const pattern = typeof opts.flags.e === 'string' ? opts.flags.e : texts[0]
+  const pattern = patternArg(texts, opts.flags) ?? undefined
   if (pattern === undefined) {
     return [
       null,

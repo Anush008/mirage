@@ -35,6 +35,20 @@ export function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+// Resolve the pattern-list argument from -e values (list[str] when
+// repeatable) or the positional. Returns the POSIX newline-joined pattern
+// list, or null when neither was supplied.
+export function patternArg(
+  texts: readonly string[],
+  flags: Record<string, string | boolean | string[]>,
+): string | null {
+  const e = flags.e
+  if (Array.isArray(e) && e.length > 0) return e.join('\n')
+  if (typeof e === 'string') return e
+  if (texts.length > 0 && texts[0] !== undefined) return texts[0]
+  return null
+}
+
 export function mergePatternList(
   pattern: string | null,
   fileData: Uint8Array | null,

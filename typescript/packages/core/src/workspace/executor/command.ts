@@ -301,7 +301,7 @@ function parseFlags(
   mount: Mount,
   cmdName: string,
   cwd: string,
-): [PathSpec[], string[], Record<string, string | boolean>, string[]] {
+): [PathSpec[], string[], Record<string, string | boolean | string[]>, string[]] {
   const argv: string[] = parts.map((item) => (item instanceof PathSpec ? item.original : item))
   const scopeMap = new Map<string, PathSpec>()
   for (const item of parts) {
@@ -453,7 +453,7 @@ async function injectChildMounts(
   stdout: ByteSource | null,
   registry: MountRegistry,
   paths: readonly PathSpec[],
-  flagKwargs: Record<string, string | boolean>,
+  flagKwargs: Record<string, string | boolean | string[]>,
   cwd: string,
 ): Promise<ByteSource | null> {
   if (flagKwargs.d === true || flagKwargs.R === true) return stdout

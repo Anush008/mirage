@@ -25,6 +25,7 @@ import {
   grepRecursive,
   grepStream,
   mergePatternList,
+  patternArg,
 } from '../grep_helper.ts'
 import { resolveSource } from '../utils/stream.ts'
 
@@ -58,16 +59,16 @@ interface FlagSet {
 
 function getPattern(
   texts: readonly string[],
-  flags: Record<string, string | boolean>,
+  flags: Record<string, string | boolean | string[]>,
 ): string | null {
-  if (typeof flags.e === 'string') return flags.e
-  if (texts.length > 0 && texts[0] !== undefined) return texts[0]
-  if (typeof flags.f === 'string') return null
+  const pattern = patternArg(texts, flags)
+  if (pattern !== null) return pattern
+  if (Array.isArray(flags.f)) return null
   throw new Error('grep: usage: grep [flags] pattern [path]')
 }
 
-function parseFlags(flags: Record<string, string | boolean>): FlagSet {
-  const toInt = (v: string | boolean | undefined): number | null =>
+function parseFlags(flags: Record<string, string | boolean | string[]>): FlagSet {
+  const toInt = (v: string | boolean | string[] | undefined): number | null =>
     typeof v === 'string' ? Number.parseInt(v, 10) : null
   const aCtx = toInt(flags.A)
   const bCtx = toInt(flags.B)
@@ -132,9 +133,9 @@ export async function grepGeneric(
   const f = parseFlags(opts.flags)
   const recursive = opts.flags.r === true || opts.flags.R === true
 
-  if (typeof opts.flags.f === 'string') {
-    // Repeatable -f carries newline-joined resolved paths; read each file.
-    for (const filePath of opts.flags.f.split('\n')) {
+  if (Array.isArray(opts.flags.f)) {
+    // Repeatable -f arrives as a list of resolved paths; read each file.
+    for (const filePath of opts.flags.f) {
       const patternSpec = PathSpec.fromStrPath(filePath, paths[0]?.prefix ?? opts.mountPrefix ?? '')
       let fileData: Uint8Array
       try {

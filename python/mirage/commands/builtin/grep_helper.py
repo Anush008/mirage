@@ -13,7 +13,7 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping, Sequence
 
 from mirage.commands.builtin.constants import PatternType
 from mirage.commands.builtin.grep_context import grep_context_lines
@@ -56,6 +56,30 @@ def classify_pattern(
     if re.fullmatch(r'[\w\s\-_.]+', pattern):
         return PatternType.SIMPLE
     return PatternType.REGEX
+
+
+def pattern_arg(texts: Sequence[str], flags: Mapping[str,
+                                                     object]) -> str | None:
+    """Resolve the pattern-list argument from -e values or the positional.
+
+    Args:
+        texts (Sequence[str]): positional TEXT operands.
+        flags (Mapping[str, object]): raw flag kwargs; repeatable -e arrives
+            as list[str].
+
+    Returns:
+        str | None: POSIX newline-joined pattern list (each -e value may
+            itself be a newline-separated list), or None when neither -e nor
+            a positional pattern was supplied.
+    """
+    e = flags.get("e")
+    if isinstance(e, list) and e:
+        return "\n".join(str(value) for value in e)
+    if isinstance(e, str):
+        return e
+    if texts:
+        return texts[0]
+    return None
 
 
 def merge_pattern_list(
