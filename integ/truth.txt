@@ -238,6 +238,8 @@ a.txt
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
+/data/guard/g.txt
+/data/guard/sub/s.txt
 /data/mixed.txt
 /data/no_nl.txt
 /data/numbers.txt
@@ -266,6 +268,8 @@ a.txt
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
+/data/guard/g.txt
+/data/guard/sub/s.txt
 /data/mixed.txt
 /data/no_nl.txt
 /data/numbers.txt
@@ -296,6 +300,7 @@ data.jsonl
 dup.txt
 empty.txt
 fields.txt
+guard
 mixed.txt
 no_nl.txt
 numbers.txt
@@ -325,6 +330,7 @@ data.jsonl
 dup.txt
 empty.txt
 fields.txt
+guard
 mixed.txt
 no_nl.txt
 numbers.txt
@@ -434,6 +440,8 @@ baz
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
+/data/guard/g.txt
+/data/guard/sub/s.txt
 /data/mixed.txt
 /data/no_nl.txt
 /data/numbers.txt
@@ -529,7 +537,7 @@ world
       2 b
       1 c
 === find_pipe_wc ===
-22
+24
 === jq_pipe_wc ===
 3
 === cat_tr_sort ===
@@ -603,6 +611,8 @@ world
 === rg_c ===
 1
 === find_d ===
+/data/guard
+/data/guard/sub
 /data/sub
 /data/sub/deep
 === find_iname ===
@@ -612,6 +622,8 @@ world
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
+/data/guard/g.txt
+/data/guard/sub/s.txt
 /data/mixed.txt
 /data/no_nl.txt
 /data/numbers.txt
@@ -638,6 +650,8 @@ world
 /data/data.jsonl
 /data/dup.txt
 /data/fields.txt
+/data/guard
+/data/guard/sub
 /data/mixed.txt
 /data/no_nl.txt
 /data/numbers.txt
@@ -662,6 +676,8 @@ world
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
+/data/guard/g.txt
+/data/guard/sub/s.txt
 /data/mixed.txt
 /data/no_nl.txt
 /data/numbers.txt
@@ -679,6 +695,8 @@ world
 /data/sub/nested.txt
 /data/tabbed.txt
 === find_path_pattern ===
+/data/guard/sub
+/data/guard/sub/s.txt
 /data/sub
 /data/sub/deep
 /data/sub/deep/deeper.txt
@@ -973,6 +991,10 @@ baz,
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
+/data/guard
+/data/guard/g.txt
+/data/guard/sub
+/data/guard/sub/s.txt
 /data/mixed.txt
 /data/no_nl.txt
 /data/numbers.txt
@@ -1000,6 +1022,8 @@ baz,
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
+/data/guard/g.txt
+/data/guard/sub/s.txt
 /data/mixed.txt
 /data/no_nl.txt
 /data/numbers.txt
@@ -1018,6 +1042,8 @@ baz,
 /data/tabbed.txt
 === find_size_lt ===
 /data/empty.txt
+/data/guard
+/data/guard/sub
 /data/one_byte.txt
 /data/patterns2.txt
 /data/sub
@@ -1035,6 +1061,8 @@ baz,
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
+/data/guard/g.txt
+/data/guard/sub/s.txt
 /data/mixed.txt
 /data/no_nl.txt
 /data/numbers.txt
@@ -1065,6 +1093,10 @@ baz,
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
+/data/guard
+/data/guard/g.txt
+/data/guard/sub
+/data/guard/sub/s.txt
 /data/mixed.txt
 /data/no_nl.txt
 /data/numbers.txt
@@ -1122,7 +1154,7 @@ baz,
 === du_file ===
 24	/data/a.txt
 === du_dir ===
-616	/data
+628	/data
 === du_h ===
 24B	/data/a.txt
 === tree ===
@@ -1523,3 +1555,23 @@ exit=1
 === grep_dir_among_files ===
 exit=0
 /data/a.txt:hello
+=== guard_cp_same_file ===
+exit=1
+=== guard_mv_same_file ===
+exit=1
+=== guard_mv_same_file_intact ===
+exit=0
+guard
+=== guard_mv_into_dir_where_file_lives ===
+exit=1
+=== guard_cp_dir_into_itself ===
+exit=1
+=== guard_mv_dir_into_own_subtree ===
+exit=1
+=== guard_cp_missing_source_continues ===
+exit=1
+=== guard_state_after ===
+exit=0
+/data/guard/g.txt
+/data/guard/sub/g.txt
+/data/guard/sub/s.txt

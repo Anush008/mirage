@@ -45,6 +45,8 @@ export const SEED_FILES: Record<string, string> = {
   "/data/prefix_dup.txt": "1 apple\n2 apple\n3 banana\n",
   "/data/patterns.txt": "world\nbar\n",
   "/data/patterns2.txt": "baz\n",
+  "/data/guard/g.txt": "guard\n",
+  "/data/guard/sub/s.txt": "inner\n",
 };
 
 export const CASES: ReadonlyArray<readonly [string, string]> = [
@@ -81,7 +83,7 @@ export const CASES: ReadonlyArray<readonly [string, string]> = [
   ["jq_jsonl_id", 'jq ".id" /data/data.jsonl'],
   ["jq_jsonl_chain", 'jq ".[].id" /data/data.jsonl'],
   ["jq_jsonl_chain_raw", 'jq -r ".[].msg" /data/chat.jsonl'],
-  ["jq_no_filter_piped", 'cat /data/user.json | jq'],
+  ["jq_no_filter_piped", "cat /data/user.json | jq"],
 
   ["sort", "sort /data/a.txt"],
   ["sort_r", "sort -r /data/a.txt"],
@@ -497,6 +499,16 @@ export const EXIT_CODE_CASES: ReadonlyArray<readonly [string, string]> = [
   // ----- grep directory operands (GNU: warn on stderr, files still match) -----
   ["grep_dir_operand", "grep hello /data/sub"],
   ["grep_dir_among_files", "grep hello /data/a.txt /data/sub"],
+
+  // ----- cp/mv coreutils guards (same-file, subtree, missing source) -----
+  ["guard_cp_same_file", "cp /data/guard/g.txt /data/guard/g.txt"],
+  ["guard_mv_same_file", "mv /data/guard/g.txt /data/guard/g.txt"],
+  ["guard_mv_same_file_intact", "cat /data/guard/g.txt"],
+  ["guard_mv_into_dir_where_file_lives", "mv /data/guard/sub/s.txt /data/guard/sub"],
+  ["guard_cp_dir_into_itself", "cp -r /data/guard/sub /data/guard/sub"],
+  ["guard_mv_dir_into_own_subtree", "mv /data/guard /data/guard/sub"],
+  ["guard_cp_missing_source_continues", "cp /data/missing.txt /data/guard/g.txt /data/guard/sub"],
+  ["guard_state_after", "find /data/guard -type f"],
 ];
 
 const ENC = new TextEncoder();

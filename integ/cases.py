@@ -72,6 +72,10 @@ SEED_FILES = {
     "world\nbar\n",
     "/data/patterns2.txt":
     "baz\n",
+    "/data/guard/g.txt":
+    "guard\n",
+    "/data/guard/sub/s.txt":
+    "inner\n",
 }
 
 CASES: list[tuple[str, str]] = [
@@ -569,6 +573,18 @@ EXIT_CODE_CASES: list[tuple[str, str]] = [
     # ----- grep directory operands (GNU: warn, files still match) -----
     ("grep_dir_operand", "grep hello /data/sub"),
     ("grep_dir_among_files", "grep hello /data/a.txt /data/sub"),
+
+    # ----- cp/mv coreutils guards (same-file, subtree, missing source) -----
+    ("guard_cp_same_file", "cp /data/guard/g.txt /data/guard/g.txt"),
+    ("guard_mv_same_file", "mv /data/guard/g.txt /data/guard/g.txt"),
+    ("guard_mv_same_file_intact", "cat /data/guard/g.txt"),
+    ("guard_mv_into_dir_where_file_lives",
+     "mv /data/guard/sub/s.txt /data/guard/sub"),
+    ("guard_cp_dir_into_itself", "cp -r /data/guard/sub /data/guard/sub"),
+    ("guard_mv_dir_into_own_subtree", "mv /data/guard /data/guard/sub"),
+    ("guard_cp_missing_source_continues",
+     "cp /data/missing.txt /data/guard/g.txt /data/guard/sub"),
+    ("guard_state_after", "find /data/guard -type f"),
 ]
 
 
