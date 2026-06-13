@@ -3,7 +3,8 @@ from aioresponses import CallbackResult, aioresponses
 
 from mirage.accessor.onedrive import OneDriveAccessor, OneDriveConfig
 from mirage.core.onedrive.read import read_bytes
-from mirage.observe.context import push_revisions, reset_revisions
+from mirage.observe.context import (push_revisions, reset_revisions,
+                                    start_recording, stop_recording)
 from mirage.types import PathSpec
 
 
@@ -54,6 +55,37 @@ async def test_read_range_sends_range_header():
                                 size=3)
     assert captured["range"] == "bytes=2-4"
     assert data == b"llo"
+
+
+@pytest.mark.asyncio
+async def test_read_captures_fingerprint_and_revision_when_recording():
+    meta = _BASE + "/root:/Docs/a.txt"
+    versions = _BASE + "/root:/Docs/a.txt:/versions"
+    sink = start_recording()
+    try:
+        with aioresponses() as m:
+            m.get(_CONTENT, body=b"current bytes")
+            m.get(meta, payload={"id": "01", "cTag": "ctag-xyz"})
+            m.get(versions,
+                  payload={
+                      "value": [
+                          {
+                              "id": "1.0",
+                              "lastModifiedDateTime": "2026-01-01T00:00:00Z"
+                          },
+                          {
+                              "id": "2.0",
+                              "lastModifiedDateTime": "2026-02-01T00:00:00Z"
+                          },
+                      ]
+                  })
+            await read_bytes(_accessor(),
+                             PathSpec.from_str_path("/Docs/a.txt"))
+    finally:
+        stop_recording()
+    rec = sink[0]
+    assert rec.fingerprint == "ctag-xyz"
+    assert rec.revision == "2.0"
 
 
 @pytest.mark.asyncio

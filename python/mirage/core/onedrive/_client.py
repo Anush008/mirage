@@ -12,6 +12,7 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import asyncio
 from urllib.parse import quote
 
 import aiohttp
@@ -21,6 +22,8 @@ from mirage.resource.secrets import reveal_secret
 from mirage.types import PathSpec
 
 GRAPH_API = "https://graph.microsoft.com/v1.0"
+RETRY_STATUSES = {429, 503, 504}
+MAX_BACKOFF = 30.0
 
 
 def split_path(path: PathSpec | str) -> tuple[str, str]:
@@ -75,15 +78,26 @@ def drive_ref_path(config: OneDriveConfig, folder: str = "") -> str:
     return f"{base}/root:"
 
 
+def _resolve_token(config: OneDriveConfig) -> str:
+    token = config.access_token
+    if callable(token):
+        token = token()
+    return reveal_secret(token)
+
+
 def headers(config: OneDriveConfig) -> dict[str, str]:
     return {
-        "Authorization": f"Bearer {reveal_secret(config.access_token)}",
+        "Authorization": f"Bearer {_resolve_token(config)}",
         "Content-Type": "application/json",
     }
 
 
 def _timeout(config: OneDriveConfig) -> aiohttp.ClientTimeout:
     return aiohttp.ClientTimeout(total=config.timeout)
+
+
+def new_session(config: OneDriveConfig) -> aiohttp.ClientSession:
+    return aiohttp.ClientSession(timeout=_timeout(config))
 
 
 async def _raise_for_status(method: str, url: str,
@@ -99,92 +113,208 @@ async def _raise_for_status(method: str, url: str,
                      err.get("message", f"{method} {url}"))
 
 
+def _retry_delay(resp: aiohttp.ClientResponse, attempt: int) -> float:
+    retry_after = resp.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return float(retry_after)
+        except ValueError:
+            pass
+    return min(2.0**attempt, MAX_BACKOFF)
+
+
+def _should_retry(status: int, attempt: int, config: OneDriveConfig) -> bool:
+    return status in RETRY_STATUSES and attempt < config.max_retries
+
+
+async def _request(config: OneDriveConfig,
+                   method: str,
+                   url: str,
+                   *,
+                   session: aiohttp.ClientSession | None = None,
+                   params: dict | None = None,
+                   json_body: dict | None = None,
+                   data: bytes | None = None,
+                   extra_headers: dict | None = None,
+                   read: str = "json"):
+    own = session is None
+    sess = session or aiohttp.ClientSession(timeout=_timeout(config))
+    try:
+        attempt = 0
+        while True:
+            hdrs = headers(config)
+            if extra_headers:
+                hdrs.update(extra_headers)
+            async with sess.request(method,
+                                    url,
+                                    headers=hdrs,
+                                    params=params,
+                                    json=json_body,
+                                    data=data) as resp:
+                if _should_retry(resp.status, attempt, config):
+                    await asyncio.sleep(_retry_delay(resp, attempt))
+                    attempt += 1
+                    continue
+                await _raise_for_status(method, url, resp)
+                if read == "bytes":
+                    return await resp.read()
+                if read == "none":
+                    return None
+                if read == "location":
+                    return resp.headers.get("Location")
+                if resp.status == 204 or resp.content_length == 0:
+                    return {}
+                try:
+                    return await resp.json()
+                except (aiohttp.ContentTypeError, ValueError):
+                    return {}
+    finally:
+        if own:
+            await sess.close()
+
+
 async def graph_get(config: OneDriveConfig,
                     url: str,
-                    params: dict | None = None) -> dict:
-    async with aiohttp.ClientSession(timeout=_timeout(config)) as session:
-        async with session.get(url, headers=headers(config),
-                               params=params) as resp:
-            await _raise_for_status("GET", url, resp)
-            return await resp.json()
+                    params: dict | None = None,
+                    session: aiohttp.ClientSession | None = None) -> dict:
+    return await _request(config, "GET", url, params=params, session=session)
 
 
-async def graph_list(config: OneDriveConfig,
-                     url: str,
-                     params: dict | None = None) -> list[dict]:
+async def graph_list(
+        config: OneDriveConfig,
+        url: str,
+        params: dict | None = None,
+        session: aiohttp.ClientSession | None = None) -> list[dict]:
     items: list[dict] = []
     next_url: str | None = url
     next_params = params
-    async with aiohttp.ClientSession(timeout=_timeout(config)) as session:
+    own = session is None
+    sess = session or aiohttp.ClientSession(timeout=_timeout(config))
+    try:
         while next_url:
-            async with session.get(next_url,
-                                   headers=headers(config),
-                                   params=next_params) as resp:
-                await _raise_for_status("GET", next_url, resp)
-                data = await resp.json()
+            data = await _request(config,
+                                  "GET",
+                                  next_url,
+                                  params=next_params,
+                                  session=sess)
             items.extend(data.get("value", []))
             next_url = data.get("@odata.nextLink")
             next_params = None
+    finally:
+        if own:
+            await sess.close()
     return items
 
 
-async def graph_get_bytes(config: OneDriveConfig,
-                          url: str,
-                          range_header: str | None = None) -> bytes:
-    hdrs = headers(config)
-    if range_header:
-        hdrs["Range"] = range_header
-    async with aiohttp.ClientSession(timeout=_timeout(config)) as session:
-        async with session.get(url, headers=hdrs) as resp:
-            await _raise_for_status("GET", url, resp)
-            return await resp.read()
+async def graph_get_bytes(
+        config: OneDriveConfig,
+        url: str,
+        range_header: str | None = None,
+        session: aiohttp.ClientSession | None = None) -> bytes:
+    extra = {"Range": range_header} if range_header else None
+    return await _request(config,
+                          "GET",
+                          url,
+                          extra_headers=extra,
+                          session=session,
+                          read="bytes")
 
 
 async def graph_stream(config: OneDriveConfig,
                        url: str,
-                       chunk_size: int = 8192):
-    async with aiohttp.ClientSession(timeout=_timeout(config)) as session:
-        async with session.get(url, headers=headers(config)) as resp:
-            await _raise_for_status("GET", url, resp)
-            async for chunk in resp.content.iter_chunked(chunk_size):
-                yield chunk
+                       chunk_size: int = 8192,
+                       session: aiohttp.ClientSession | None = None):
+    own = session is None
+    sess = session or aiohttp.ClientSession(timeout=_timeout(config))
+    try:
+        attempt = 0
+        while True:
+            async with sess.get(url, headers=headers(config)) as resp:
+                if _should_retry(resp.status, attempt, config):
+                    await asyncio.sleep(_retry_delay(resp, attempt))
+                    attempt += 1
+                    continue
+                await _raise_for_status("GET", url, resp)
+                async for chunk in resp.content.iter_chunked(chunk_size):
+                    yield chunk
+                return
+    finally:
+        if own:
+            await sess.close()
 
 
 async def graph_post(config: OneDriveConfig,
                      url: str,
-                     body: dict | None = None) -> dict:
-    async with aiohttp.ClientSession(timeout=_timeout(config)) as session:
-        async with session.post(url, headers=headers(config), json=body
-                                or {}) as resp:
-            await _raise_for_status("POST", url, resp)
-            return await resp.json()
+                     body: dict | None = None,
+                     session: aiohttp.ClientSession | None = None) -> dict:
+    return await _request(config,
+                          "POST",
+                          url,
+                          json_body=body or {},
+                          session=session)
 
 
-async def graph_patch(config: OneDriveConfig, url: str, body: dict) -> dict:
-    async with aiohttp.ClientSession(timeout=_timeout(config)) as session:
-        async with session.patch(url, headers=headers(config),
-                                 json=body) as resp:
-            await _raise_for_status("PATCH", url, resp)
-            return await resp.json()
+async def graph_post_monitor(
+        config: OneDriveConfig,
+        url: str,
+        body: dict | None = None,
+        session: aiohttp.ClientSession | None = None) -> str | None:
+    return await _request(config,
+                          "POST",
+                          url,
+                          json_body=body or {},
+                          session=session,
+                          read="location")
 
 
-async def graph_delete(config: OneDriveConfig, url: str) -> None:
-    async with aiohttp.ClientSession(timeout=_timeout(config)) as session:
-        async with session.delete(url, headers=headers(config)) as resp:
-            await _raise_for_status("DELETE", url, resp)
+async def graph_patch(config: OneDriveConfig,
+                      url: str,
+                      body: dict,
+                      session: aiohttp.ClientSession | None = None) -> dict:
+    return await _request(config,
+                          "PATCH",
+                          url,
+                          json_body=body,
+                          session=session)
+
+
+async def graph_delete(config: OneDriveConfig,
+                       url: str,
+                       session: aiohttp.ClientSession | None = None) -> None:
+    await _request(config, "DELETE", url, session=session, read="none")
 
 
 async def graph_put_bytes(
         config: OneDriveConfig,
         url: str,
         data: bytes,
-        content_type: str = "application/octet-stream") -> dict:
-    hdrs = headers(config)
-    hdrs["Content-Type"] = content_type
-    async with aiohttp.ClientSession(timeout=_timeout(config)) as session:
-        async with session.put(url, headers=hdrs, data=data) as resp:
-            await _raise_for_status("PUT", url, resp)
-            return await resp.json()
+        content_type: str = "application/octet-stream",
+        session: aiohttp.ClientSession | None = None) -> dict:
+    return await _request(config,
+                          "PUT",
+                          url,
+                          data=data,
+                          extra_headers={"Content-Type": content_type},
+                          session=session)
+
+
+async def poll_monitor(url: str,
+                       timeout: float,
+                       interval: float = 1.0) -> dict:
+    waited = 0.0
+    async with aiohttp.ClientSession() as session:
+        while True:
+            async with session.get(url) as resp:
+                if resp.status >= 400:
+                    raise GraphError(resp.status, "monitorError", f"GET {url}")
+                payload = await resp.json()
+            status = payload.get("status")
+            if status in ("completed", "failed"):
+                return payload
+            if waited >= timeout:
+                return payload
+            await asyncio.sleep(interval)
+            waited += interval
 
 
 async def upload_chunk(config: OneDriveConfig, upload_url: str, data: bytes,
@@ -192,6 +322,13 @@ async def upload_chunk(config: OneDriveConfig, upload_url: str, data: bytes,
     end = start + len(data) - 1
     hdrs = {"Content-Range": f"bytes {start}-{end}/{total}"}
     async with aiohttp.ClientSession(timeout=_timeout(config)) as session:
-        async with session.put(upload_url, headers=hdrs, data=data) as resp:
-            await _raise_for_status("PUT", upload_url, resp)
-            return resp.status
+        attempt = 0
+        while True:
+            async with session.put(upload_url, headers=hdrs,
+                                   data=data) as resp:
+                if _should_retry(resp.status, attempt, config):
+                    await asyncio.sleep(_retry_delay(resp, attempt))
+                    attempt += 1
+                    continue
+                await _raise_for_status("PUT", upload_url, resp)
+                return resp.status

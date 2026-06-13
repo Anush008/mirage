@@ -15,9 +15,16 @@
 from urllib.parse import quote
 
 from mirage.accessor.onedrive import OneDriveAccessor
-from mirage.core.onedrive._client import (graph_list, graph_post, item_url,
-                                          split_path)
+from mirage.core.onedrive._client import (graph_get, graph_list, graph_post,
+                                          item_url, split_path)
 from mirage.types import PathSpec
+
+
+def _current_version_id(versions: list[dict]) -> str | None:
+    if not versions:
+        return None
+    current = max(versions, key=lambda v: v.get("lastModifiedDateTime") or "")
+    return current.get("id")
 
 
 async def list_versions(accessor: OneDriveAccessor,
@@ -30,9 +37,18 @@ async def list_versions(accessor: OneDriveAccessor,
 async def current_version_id(accessor: OneDriveAccessor,
                              path: PathSpec) -> str | None:
     versions = await list_versions(accessor, path)
-    if not versions:
-        return None
-    return versions[0].get("id")
+    return _current_version_id(versions)
+
+
+async def current_fingerprint_revision(
+        accessor: OneDriveAccessor,
+        path: PathSpec) -> tuple[str | None, str | None]:
+    _, stripped = split_path(path)
+    config = accessor.config
+    item = await graph_get(config, item_url(config, "/" + stripped))
+    versions = await graph_list(
+        config, item_url(config, "/" + stripped, action="/versions"))
+    return item.get("cTag"), _current_version_id(versions)
 
 
 async def restore_version(accessor: OneDriveAccessor, path: PathSpec,

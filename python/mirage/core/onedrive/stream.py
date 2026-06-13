@@ -19,6 +19,7 @@ from mirage.accessor.onedrive import OneDriveAccessor
 from mirage.cache.index import IndexCacheStore
 from mirage.core.onedrive._client import graph_stream, item_url, split_path
 from mirage.core.onedrive.read import read_bytes
+from mirage.core.onedrive.versions import current_fingerprint_revision
 from mirage.observe.context import record_stream, revision_for
 from mirage.types import PathSpec
 
@@ -40,7 +41,11 @@ async def read_stream(
     url = item_url(config, "/" + stripped, action=action)
     rec = record_stream("read", stripped, "onedrive")
     if rec is not None:
-        rec.revision = pinned
+        if pinned is not None:
+            rec.revision = pinned
+        else:
+            rec.fingerprint, rec.revision = await current_fingerprint_revision(
+                accessor, path)
     async for chunk in graph_stream(config, url, chunk_size):
         if rec is not None:
             rec.bytes += len(chunk)

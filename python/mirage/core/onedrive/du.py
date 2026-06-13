@@ -13,7 +13,7 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 from mirage.accessor.onedrive import OneDriveAccessor
-from mirage.core.onedrive._client import split_path
+from mirage.core.onedrive._client import new_session, split_path
 from mirage.core.onedrive.find import iter_tree
 from mirage.types import PathSpec
 
@@ -21,9 +21,12 @@ from mirage.types import PathSpec
 async def du(accessor: OneDriveAccessor, path: PathSpec) -> int:
     _, base = split_path(path)
     total = 0
-    async for _rel, item, is_dir in iter_tree(accessor.config, base):
-        if not is_dir:
-            total += item.get("size", 0)
+    async with new_session(accessor.config) as session:
+        async for _rel, item, is_dir in iter_tree(accessor.config,
+                                                  base,
+                                                  session=session):
+            if not is_dir:
+                total += item.get("size", 0)
     return total
 
 
@@ -32,11 +35,14 @@ async def du_all(accessor: OneDriveAccessor,
     _, base = split_path(path)
     results: list[tuple[str, int]] = []
     total = 0
-    async for rel, item, is_dir in iter_tree(accessor.config, base):
-        if is_dir:
-            continue
-        size = item.get("size", 0)
-        results.append(("/" + rel, size))
-        total += size
+    async with new_session(accessor.config) as session:
+        async for rel, item, is_dir in iter_tree(accessor.config,
+                                                 base,
+                                                 session=session):
+            if is_dir:
+                continue
+            size = item.get("size", 0)
+            results.append(("/" + rel, size))
+            total += size
     results.append(("/" + base if base else "/", total))
     return results

@@ -28,7 +28,7 @@ async def _exists(accessor: OneDriveAccessor, path: PathSpec | str) -> bool:
     try:
         await stat_impl(accessor, path)
         return True
-    except (FileNotFoundError, ValueError, Exception):
+    except FileNotFoundError:
         return False
 
 
@@ -51,22 +51,18 @@ async def cp(
         raise ValueError("cp: requires src and dst")
     paths = await resolve_glob(accessor, paths, index)
     recursive = r or R or a
-    verbose_lines: list[str] = []
     if recursive:
         src_base = paths[0].strip_prefix.rstrip("/")
         dst_base = paths[1].strip_prefix.rstrip("/")
-        entries = await find_impl(accessor, paths[0], type="f")
-        for entry in entries:
-            rel = entry[len(src_base):]
-            dst = dst_base + rel
-            if n and await _exists(accessor, dst):
-                continue
-            await copy(accessor, entry, dst)
-            if v:
-                verbose_lines.append(f"{entry} -> {dst}")
-        writes = {dst_base + entry[len(src_base):]: b"" for entry in entries}
-        output = "\n".join(verbose_lines) + "\n" if verbose_lines else None
-        return output.encode() if output else None, IOResult(writes=writes)
+        if n and await _exists(accessor, paths[1]):
+            return None, IOResult()
+        files = await find_impl(accessor, paths[0], type="file")
+        await copy(accessor, paths[0], paths[1])
+        writes = {dst_base + f[len(src_base):]: b"" for f in files}
+        if v:
+            lines = [f"{f} -> {dst_base + f[len(src_base):]}" for f in files]
+            return ("\n".join(lines) + "\n").encode(), IOResult(writes=writes)
+        return None, IOResult(writes=writes)
     if n and await _exists(accessor, paths[1]):
         return None, IOResult()
     await copy(accessor, paths[0], paths[1])

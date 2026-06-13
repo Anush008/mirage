@@ -7,6 +7,11 @@ from mirage.core.onedrive._client import (GraphError, drive_base, graph_get,
                                           item_url)
 
 
+def test_headers_resolves_callable_token():
+    h = headers(OneDriveConfig(access_token=lambda: "live-token"))
+    assert h["Authorization"] == "Bearer live-token"
+
+
 def _cfg(**kw) -> OneDriveConfig:
     return OneDriveConfig(access_token="tok", **kw)
 
@@ -114,3 +119,22 @@ async def test_graph_get_bytes_returns_raw_content():
         m.get(url, body=b"hello bytes")
         data = await graph_get_bytes(_cfg(), url)
     assert data == b"hello bytes"
+
+
+@pytest.mark.asyncio
+async def test_request_retries_on_429_then_succeeds():
+    with aioresponses() as m:
+        m.get(_ROOT, status=429, headers={"Retry-After": "0"})
+        m.get(_ROOT, payload={"id": "ok"})
+        result = await graph_get(_cfg(), _ROOT)
+    assert result["id"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_request_gives_up_after_max_retries():
+    with aioresponses() as m:
+        for _ in range(3):
+            m.get(_ROOT, status=429, headers={"Retry-After": "0"})
+        with pytest.raises(GraphError) as exc:
+            await graph_get(_cfg(max_retries=2), _ROOT)
+    assert exc.value.status == 429

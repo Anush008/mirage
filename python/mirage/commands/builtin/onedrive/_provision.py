@@ -14,7 +14,7 @@
 
 from mirage.accessor.onedrive import OneDriveAccessor
 from mirage.cache.index import IndexCacheStore
-from mirage.core.onedrive.stat import stat as s3_stat
+from mirage.core.onedrive.stat import stat as onedrive_stat
 from mirage.provision.types import Precision, ProvisionResult
 from mirage.types import PathSpec
 
@@ -28,9 +28,8 @@ async def _resolve_sizes(
 
     Order of resolution per path:
         1. Index lookup -- free, no network call.
-        2. ``head_object`` via ``s3_stat`` -- one S3 metadata call (~50ms,
-           ~100 bytes). Populates the index as a side effect, so the next
-           provision is free.
+        2. ``onedrive_stat`` -- one Graph metadata call. Populates the
+           index as a side effect, so the next provision is free.
 
     Returns:
         (resolved, missing): list of (path_str, size) for paths whose
@@ -48,7 +47,7 @@ async def _resolve_sizes(
                 size = lookup.entry.size
         if size is None:
             try:
-                file_stat = await s3_stat(accessor, p, index)
+                file_stat = await onedrive_stat(accessor, p, index)
                 size = file_stat.size
             except (FileNotFoundError, ValueError):
                 pass
@@ -142,7 +141,7 @@ async def metadata_provision(
 ) -> ProvisionResult:
     """Cost estimate for metadata-only ops (stat, ls, find).
 
-    These hit the S3 API but don't transfer bytes. We report
+    These hit the Graph API but don't transfer bytes. We report
     ``read_ops`` so callers can multiply by the per-request cost.
     """
     n = max(1, len(paths) if paths else 1)

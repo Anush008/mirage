@@ -15,8 +15,9 @@
 import posixpath
 
 from mirage.accessor.onedrive import OneDriveAccessor
-from mirage.core.onedrive._client import (drive_ref_path, graph_post, item_url,
-                                          split_path)
+from mirage.core.onedrive._client import (GraphError, drive_ref_path,
+                                          graph_post_monitor, item_url,
+                                          poll_monitor, split_path)
 from mirage.types import PathSpec
 
 
@@ -33,4 +34,15 @@ async def copy(accessor: OneDriveAccessor, src: PathSpec,
             "path": drive_ref_path(accessor.config, dst_parent)
         },
     }
-    await graph_post(accessor.config, url, body)
+    monitor = await graph_post_monitor(accessor.config, url, body)
+    if not monitor:
+        return
+    result = await poll_monitor(monitor, timeout=accessor.config.timeout)
+    status = result.get("status")
+    if status == "failed":
+        err = result.get("error", {}) if isinstance(result, dict) else {}
+        raise GraphError(500, err.get("code", "copyFailed"),
+                         err.get("message", f"copy {src_s} -> {dst_s} failed"))
+    if status not in ("completed", None):
+        raise GraphError(504, "copyTimeout",
+                         f"copy {src_s} -> {dst_s} not confirmed complete")

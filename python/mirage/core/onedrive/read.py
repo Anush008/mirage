@@ -19,7 +19,8 @@ from mirage.accessor.onedrive import OneDriveAccessor
 from mirage.cache.index import IndexCacheStore
 from mirage.core.onedrive._client import (GraphError, graph_get_bytes,
                                           item_url, split_path)
-from mirage.observe.context import record, revision_for
+from mirage.core.onedrive.versions import current_fingerprint_revision
+from mirage.observe.context import active_recorder, record, revision_for
 from mirage.types import PathSpec
 
 
@@ -52,5 +53,16 @@ async def read_bytes(accessor: OneDriveAccessor,
         if exc.status == 404:
             raise FileNotFoundError(stripped)
         raise
-    record("read", stripped, "onedrive", len(data), start_ms, revision=pinned)
+    fingerprint = None
+    revision = pinned
+    if pinned is None and active_recorder() is not None:
+        fingerprint, revision = await current_fingerprint_revision(
+            accessor, path)
+    record("read",
+           stripped,
+           "onedrive",
+           len(data),
+           start_ms,
+           fingerprint=fingerprint,
+           revision=revision)
     return data
