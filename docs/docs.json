@@ -70,7 +70,7 @@
             "group": "Learn",
             "pages": [
               "home/architecture",
-              "home/shell",
+              "home/bash",
               "home/resource-matrix",
               "home/cache",
               "home/snapshot",
@@ -173,7 +173,7 @@
               },
               {
                 "group": "Knowledge",
-                "icon": "/images/dify-logo.svg",
+                "icon": "brain",
                 "pages": [
                   "home/setup/dify"
                 ]
@@ -318,7 +318,7 @@
               },
               {
                 "group": "Knowledge",
-                "icon": "/images/dify-logo.svg",
+                "icon": "brain",
                 "pages": [
                   "python/resource/dify"
                 ]
