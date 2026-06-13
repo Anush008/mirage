@@ -32,7 +32,9 @@ def split_path(path: PathSpec | str) -> tuple[str, str]:
     prefix = path.prefix or ""
     raw = path.original
     if prefix and raw.startswith(prefix):
-        raw = raw[len(prefix):] or "/"
+        rest = raw[len(prefix):]
+        if prefix.endswith("/") or rest == "" or rest.startswith("/"):
+            raw = rest or "/"
     return prefix, raw.strip("/")
 
 
@@ -127,6 +129,18 @@ def _should_retry(status: int, attempt: int, config: OneDriveConfig) -> bool:
     return status in RETRY_STATUSES and attempt < config.max_retries
 
 
+async def _retry_action(resp: aiohttp.ClientResponse, attempt: int,
+                        refreshed: bool, config: OneDriveConfig,
+                        auth: bool) -> str:
+    if _should_retry(resp.status, attempt, config):
+        await asyncio.sleep(_retry_delay(resp, attempt))
+        return "retry"
+    if (resp.status == 401 and auth and not refreshed
+            and callable(config.access_token)):
+        return "refresh"
+    return "ok"
+
+
 async def _request(config: OneDriveConfig,
                    method: str,
                    url: str,
@@ -153,12 +167,12 @@ async def _request(config: OneDriveConfig,
                                     params=params,
                                     json=json_body,
                                     data=data) as resp:
-                if _should_retry(resp.status, attempt, config):
-                    await asyncio.sleep(_retry_delay(resp, attempt))
+                action = await _retry_action(resp, attempt, refreshed, config,
+                                             auth)
+                if action == "retry":
                     attempt += 1
                     continue
-                if (resp.status == 401 and auth and not refreshed
-                        and callable(config.access_token)):
+                if action == "refresh":
                     refreshed = True
                     continue
                 await _raise_for_status(method, url, resp)
@@ -236,12 +250,17 @@ async def graph_stream(config: OneDriveConfig,
     sess = session or aiohttp.ClientSession(timeout=_timeout(config))
     try:
         attempt = 0
+        refreshed = False
         while True:
             hdrs = headers(config) if auth else {}
             async with sess.get(url, headers=hdrs) as resp:
-                if _should_retry(resp.status, attempt, config):
-                    await asyncio.sleep(_retry_delay(resp, attempt))
+                action = await _retry_action(resp, attempt, refreshed, config,
+                                             auth)
+                if action == "retry":
                     attempt += 1
+                    continue
+                if action == "refresh":
+                    refreshed = True
                     continue
                 await _raise_for_status("GET", url, resp)
                 async for chunk in resp.content.iter_chunked(chunk_size):

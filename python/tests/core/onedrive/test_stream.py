@@ -26,6 +26,41 @@ async def test_read_stream_yields_full_content():
 
 
 @pytest.mark.asyncio
+async def test_read_stream_missing_raises_file_not_found():
+    with aioresponses() as m:
+        m.get(_CONTENT,
+              status=404,
+              payload={"error": {
+                  "code": "itemNotFound",
+                  "message": "no"
+              }})
+        with pytest.raises(FileNotFoundError):
+            async for _ in read_stream(_accessor(),
+                                       PathSpec.from_str_path("/Docs/a.txt")):
+                pass
+
+
+@pytest.mark.asyncio
+async def test_read_stream_refreshes_callable_token_on_401():
+    calls = {"n": 0}
+
+    def provider():
+        calls["n"] += 1
+        return "fresh" if calls["n"] > 1 else "stale"
+
+    accessor = OneDriveAccessor(OneDriveConfig(access_token=provider))
+    with aioresponses() as m:
+        m.get(_CONTENT, status=401, payload={"error": {"code": "expired"}})
+        m.get(_CONTENT, body=b"abcdef")
+        chunks = [
+            c async for c in read_stream(accessor,
+                                         PathSpec.from_str_path("/Docs/a.txt"))
+        ]
+    assert b"".join(chunks) == b"abcdef"
+    assert calls["n"] == 2
+
+
+@pytest.mark.asyncio
 async def test_range_read_returns_requested_bytes():
     captured = {}
 

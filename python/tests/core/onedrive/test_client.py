@@ -4,7 +4,20 @@ from aioresponses import aioresponses
 from mirage.accessor.onedrive import OneDriveConfig
 from mirage.core.onedrive._client import (GraphError, drive_base, graph_get,
                                           graph_get_bytes, graph_list, headers,
-                                          item_url)
+                                          item_url, split_path)
+from mirage.types import PathSpec
+
+
+def test_split_path_strips_real_prefix():
+    p = PathSpec(original="/od/a.txt", directory="/od/a.txt", prefix="/od")
+    assert split_path(p) == ("/od", "a.txt")
+
+
+def test_split_path_does_not_strip_sibling_prefix_match():
+    p = PathSpec(original="database.txt",
+                 directory="database.txt",
+                 prefix="data")
+    assert split_path(p) == ("data", "database.txt")
 
 
 def test_headers_resolves_callable_token():

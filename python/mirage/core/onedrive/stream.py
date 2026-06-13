@@ -17,7 +17,8 @@ from urllib.parse import quote
 
 from mirage.accessor.onedrive import OneDriveAccessor
 from mirage.cache.index import IndexCacheStore
-from mirage.core.onedrive._client import graph_stream, item_url, split_path
+from mirage.core.onedrive._client import (GraphError, graph_stream, item_url,
+                                          split_path)
 from mirage.core.onedrive.read import read_bytes
 from mirage.core.onedrive.versions import capture_metadata
 from mirage.observe.context import record_stream, revision_for
@@ -48,10 +49,15 @@ async def read_stream(
         if download_url:
             url = download_url
             auth = False
-    async for chunk in graph_stream(config, url, chunk_size, auth=auth):
-        if rec is not None:
-            rec.bytes += len(chunk)
-        yield chunk
+    try:
+        async for chunk in graph_stream(config, url, chunk_size, auth=auth):
+            if rec is not None:
+                rec.bytes += len(chunk)
+            yield chunk
+    except GraphError as exc:
+        if exc.status == 404:
+            raise FileNotFoundError(stripped)
+        raise
 
 
 async def range_read(accessor: OneDriveAccessor, path: PathSpec, start: int,
