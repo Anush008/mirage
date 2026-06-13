@@ -133,6 +133,13 @@
                 ]
               },
               {
+                "group": "Microsoft",
+                "icon": "microsoft",
+                "pages": [
+                  "home/setup/onedrive"
+                ]
+              },
+              {
                 "group": "Cloud Files",
                 "icon": "folder-open",
                 "pages": [
@@ -277,6 +284,13 @@
                   "python/resource/gdocs",
                   "python/resource/gsheets",
                   "python/resource/gslides"
+                ]
+              },
+              {
+                "group": "Microsoft",
+                "icon": "microsoft",
+                "pages": [
+                  "python/resource/onedrive"
                 ]
               },
               {

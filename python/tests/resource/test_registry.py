@@ -62,6 +62,7 @@ EXPECTED_RESOURCES = {
     "nextcloud",
     "dify",
     "chroma",
+    "onedrive",
 }
 
 
