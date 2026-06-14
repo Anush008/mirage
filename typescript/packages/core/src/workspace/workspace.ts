@@ -1004,7 +1004,7 @@ export class Workspace {
     overrides: Record<string, Resource> = {},
   ): Promise<InstanceType<T>> {
     const bytes = typeof source === 'string' ? readFileBytes(source) : source
-    const state = (await readSnapshotTar(bytes)) as unknown as WorkspaceStateDict
+    const state = (await readSnapshotTar(bytes)) as WorkspaceStateDict
     return this.fromState(state, options, overrides)
   }
 
@@ -1014,7 +1014,7 @@ export class Workspace {
     options: WorkspaceOptions = {},
     overrides: Record<string, Resource> = {},
   ): Promise<InstanceType<T>> {
-    if (state.version !== undefined && state.version < FORMAT_VERSION) {
+    if (state.version < FORMAT_VERSION) {
       throw new Error(
         `snapshot format v${String(state.version)} not supported ` +
           `(loader expects v${String(FORMAT_VERSION)})`,
@@ -1062,7 +1062,7 @@ export class Workspace {
     const state = await this.toStateDict()
     const [manifest, blobs] = splitManifestAndBlobs(state as unknown as Record<string, unknown>)
     const tar = await writeSnapshotTar(manifest, blobs)
-    const cloned = (await readSnapshotTar(tar)) as unknown as WorkspaceStateDict
+    const cloned = (await readSnapshotTar(tar)) as WorkspaceStateDict
     const opts: WorkspaceOptions = {
       mode: options.mode ?? MountMode.WRITE,
       agentId: options.agentId ?? this.agentId,

@@ -42,9 +42,9 @@ import { RAMStore } from './store.ts'
 
 export interface RAMResourceState {
   type: string
-  files: Record<string, Uint8Array>
-  dirs: string[]
-  modified: Record<string, string>
+  files?: Record<string, Uint8Array>
+  dirs?: string[]
+  modified?: Record<string, string>
 }
 
 export class RAMResource extends BaseResource implements Resource {
