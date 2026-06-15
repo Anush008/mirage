@@ -75,6 +75,7 @@ describe('hf find', () => {
   it('scopes to a subdirectory and returns [] for missing dirs', async () => {
     const accessor = accessorWith(FILES)
     expect(await find(accessor, PathSpec.fromStrPath('/onnx'))).toEqual([
+      '/onnx',
       '/onnx/model.onnx',
       '/onnx/sub',
       '/onnx/sub/extra.txt',

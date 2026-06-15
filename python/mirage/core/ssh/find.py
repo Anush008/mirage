@@ -12,11 +12,11 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import fnmatch
-
 import asyncssh
 
 from mirage.accessor.ssh import SSHAccessor
+from mirage.commands.builtin.find_eval import (FindEntry, PredNode, build_tree,
+                                               keep)
 from mirage.core.ssh._client import _abs
 from mirage.types import PathSpec
 
@@ -36,6 +36,8 @@ async def find(
     iname: str | None = None,
     mindepth: int | None = None,
     path_pattern: str | None = None,
+    empty: bool = False,
+    tree: PredNode | None = None,
 ) -> list[str]:
     if isinstance(path, str):
         path = PathSpec(original=path, directory=path)
@@ -44,15 +46,34 @@ async def find(
     config = accessor.config
     sftp = await accessor.sftp()
     results: list[str] = []
-    await _walk(sftp, config, path, results, 0, maxdepth, mindepth, name,
-                iname, type, min_size, max_size, name_exclude, or_names,
-                mtime_min, mtime_max, path_pattern)
+    tree = tree if tree is not None else build_tree(name=name,
+                                                    iname=iname,
+                                                    path_pattern=path_pattern,
+                                                    type=type,
+                                                    name_exclude=name_exclude,
+                                                    or_names=or_names)
+    if path.strip("/") and (maxdepth is None or maxdepth >= 0):
+        try:
+            root_attrs = await sftp.stat(_abs(config, path))
+        except (asyncssh.SFTPError, OSError):
+            root_attrs = None
+        if root_attrs is not None:
+            is_dir = root_attrs.type == asyncssh.FILEXFER_TYPE_DIRECTORY
+            root_entry = FindEntry(key=path,
+                                   name=path.rsplit("/", 1)[-1],
+                                   kind="d" if is_dir else "f",
+                                   depth=0,
+                                   is_empty=False if is_dir else
+                                   (root_attrs.size or 0) == 0)
+            if keep(root_entry, tree, mindepth):
+                results.append(path)
+    await _walk(sftp, config, path, results, 0, maxdepth, mindepth, tree,
+                min_size, max_size, mtime_min, mtime_max)
     return sorted(results)
 
 
-async def _walk(sftp, config, path, results, depth, maxdepth, mindepth, name,
-                iname, type, min_size, max_size, name_exclude, or_names,
-                mtime_min, mtime_max, path_pattern):
+async def _walk(sftp, config, path, results, depth, maxdepth, mindepth, tree,
+                min_size, max_size, mtime_min, mtime_max):
     if maxdepth is not None and depth > maxdepth:
         return
     remote = _abs(config, path)
@@ -65,38 +86,26 @@ async def _walk(sftp, config, path, results, depth, maxdepth, mindepth, name,
             continue
         child = f"{path.rstrip('/')}/{entry.filename}"
         is_dir = entry.attrs.type == asyncssh.FILEXFER_TYPE_DIRECTORY
-        if _matches(entry, child, is_dir, depth + 1, maxdepth, mindepth, name,
-                    iname, type, min_size, max_size, name_exclude, or_names,
-                    mtime_min, mtime_max, path_pattern):
+        if _matches(entry, child, is_dir, depth + 1, maxdepth, mindepth, tree,
+                    min_size, max_size, mtime_min, mtime_max):
             results.append(child)
         if is_dir:
             await _walk(sftp, config, child, results, depth + 1, maxdepth,
-                        mindepth, name, iname, type, min_size, max_size,
-                        name_exclude, or_names, mtime_min, mtime_max,
-                        path_pattern)
+                        mindepth, tree, min_size, max_size, mtime_min,
+                        mtime_max)
 
 
-def _matches(entry, path, is_dir, depth, maxdepth, mindepth, name, iname, type,
-             min_size, max_size, name_exclude, or_names, mtime_min, mtime_max,
-             path_pattern):
+def _matches(entry, path, is_dir, depth, maxdepth, mindepth, tree, min_size,
+             max_size, mtime_min, mtime_max):
     if maxdepth is not None and depth > maxdepth:
         return False
-    if mindepth is not None and depth < mindepth:
-        return False
-    if type in ("f", "file") and is_dir:
-        return False
-    if type in ("d", "directory") and not is_dir:
-        return False
-    basename = path.rsplit("/", 1)[-1]
-    if name and not fnmatch.fnmatch(basename, name):
-        return False
-    if iname and not fnmatch.fnmatch(basename.lower(), iname.lower()):
-        return False
-    if name_exclude and fnmatch.fnmatch(basename, name_exclude):
-        return False
-    if or_names and not any(fnmatch.fnmatch(basename, n) for n in or_names):
-        return False
-    if path_pattern and not fnmatch.fnmatch(path, path_pattern):
+    find_entry = FindEntry(key=path,
+                           name=path.rsplit("/", 1)[-1],
+                           kind="d" if is_dir else "f",
+                           depth=depth,
+                           is_empty=False if is_dir else
+                           (entry.attrs.size or 0) == 0)
+    if not keep(find_entry, tree, mindepth):
         return False
     if not is_dir:
         size = entry.attrs.size or 0

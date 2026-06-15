@@ -12,47 +12,11 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import fnmatch
-
 from mirage.accessor.github import GitHubAccessor
 from mirage.cache.index import IndexCacheStore
+from mirage.commands.builtin.find_eval import (FindEntry, PredNode, build_tree,
+                                               keep)
 from mirage.types import PathSpec
-
-
-def _matches(
-    full_path: str,
-    entry_name: str,
-    is_dir: bool,
-    size: int,
-    name: str | None,
-    type: str | None,
-    min_size: int | None,
-    max_size: int | None,
-    name_exclude: str | None,
-    or_names: list[str] | None,
-    iname: str | None,
-    path_pattern: str | None,
-) -> bool:
-    if type in ("f", "file") and is_dir:
-        return False
-    if type in ("d", "directory") and not is_dir:
-        return False
-    if or_names:
-        if not any(fnmatch.fnmatch(entry_name, n) for n in or_names):
-            return False
-    elif name and not fnmatch.fnmatch(entry_name, name):
-        return False
-    if iname and not fnmatch.fnmatch(entry_name.lower(), iname.lower()):
-        return False
-    if path_pattern and not fnmatch.fnmatch(full_path, path_pattern):
-        return False
-    if name_exclude and fnmatch.fnmatch(entry_name, name_exclude):
-        return False
-    if min_size is not None and size < min_size:
-        return False
-    if max_size is not None and size > max_size:
-        return False
-    return True
 
 
 async def find(
@@ -70,6 +34,8 @@ async def find(
     iname: str | None = None,
     mindepth: int | None = None,
     path_pattern: str | None = None,
+    empty: bool = False,
+    tree: PredNode | None = None,
     index: IndexCacheStore = None,
 ) -> list[str]:
     if isinstance(path, str):
@@ -79,21 +45,32 @@ async def find(
     base = path.strip_prefix.strip("/")
     base_depth = 0 if base == "" else base.count("/") + 1
     results: list[str] = []
+    tree = tree if tree is not None else build_tree(name=name,
+                                                    iname=iname,
+                                                    path_pattern=path_pattern,
+                                                    type=type,
+                                                    name_exclude=name_exclude,
+                                                    or_names=or_names)
     for entry_path in sorted(index._entries):
         p = entry_path.lstrip("/")
         if p != base and not p.startswith(base + "/" if base else ""):
             continue
-        entry = index._entries[entry_path]
-        is_dir = entry.resource_type == "folder"
+        entry_meta = index._entries[entry_path]
+        is_dir = entry_meta.resource_type == "folder"
         full_path = "/" + p
         depth = p.count("/") + 1 - base_depth
         if maxdepth is not None and depth > maxdepth:
             continue
-        if mindepth is not None and depth < mindepth:
+        entry = FindEntry(key=full_path,
+                          name=p.rsplit("/", 1)[-1],
+                          kind="d" if is_dir else "f",
+                          depth=depth)
+        if not keep(entry, tree, mindepth):
             continue
-        entry_name = p.rsplit("/", 1)[-1]
-        if _matches(full_path, entry_name, is_dir, entry.size or 0, name, type,
-                    min_size, max_size, name_exclude, or_names, iname,
-                    path_pattern):
-            results.append(full_path)
+        size = entry_meta.size or 0
+        if min_size is not None and size < min_size:
+            continue
+        if max_size is not None and size > max_size:
+            continue
+        results.append(full_path)
     return results

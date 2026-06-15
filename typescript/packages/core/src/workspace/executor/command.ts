@@ -34,6 +34,11 @@ import type { DispatchFn } from './cross_mount.ts'
 import { handleCrossMount, isCrossMount } from './cross_mount.ts'
 import { applyFindActions } from './find_action_dispatch.ts'
 import { fanOutTraversal, shouldFanOut } from './fanout.ts'
+import {
+  FindParseError,
+  findExprTail,
+  parseFindExpression,
+} from '../../commands/builtin/findParse.ts'
 import { maybeWithTimeout } from '../../commands/builtin/utils/safeguard.ts'
 import { resolveAcrossMounts, resolveSafeguard } from '../../commands/safeguard.ts'
 import type { ExecuteNodeFn } from './jobs.ts'
@@ -122,6 +127,24 @@ export async function handleCommand(
     ]
   }
 
+  let findExprTokens: string[] | null = null
+  if (cmdName === 'find') {
+    findExprTokens = findExprTail(rawArgv)
+    try {
+      parseFindExpression(findExprTokens)
+    } catch (err) {
+      if (err instanceof FindParseError) {
+        const errBytes = new TextEncoder().encode(`${err.message}\n`)
+        return [
+          null,
+          new IOResult({ exitCode: 1, stderr: errBytes }),
+          new ExecutionNode({ command: cmdStr, stderr: errBytes, exitCode: 1 }),
+        ]
+      }
+      throw err
+    }
+  }
+
   if (unmount !== undefined && pathScopes.length === 1) {
     const intercept = await tryUnmountIntercept(cmdName, parts, pathScopes[0], registry, unmount)
     if (intercept !== null)
@@ -190,12 +213,24 @@ export async function handleCommand(
     throw err
   }
 
-  const [paths, texts, flagKwargs, parseWarnings] = parseFlags(
+  const [paths, textsRaw, flagKwargs, parseWarnings] = parseFlags(
     parts.slice(1),
     mount,
     cmdName,
     session.cwd,
   )
+  const texts = findExprTokens ?? textsRaw
+  if (findExprTokens !== null) {
+    // `repeatable: true` on find value-flags makes parseToKwargs emit arrays;
+    // bespoke backend wrappers read these as scalars. Migrated backends read
+    // the expression from `texts` and ignore flagKwargs.
+    for (const [key, value] of Object.entries(flagKwargs)) {
+      if (Array.isArray(value)) {
+        const last = value.at(-1)
+        if (last !== undefined) flagKwargs[key] = last
+      }
+    }
+  }
   const warnBytes =
     parseWarnings.length > 0
       ? new TextEncoder().encode(parseWarnings.map((w) => `${cmdName}: ${w}\n`).join(''))

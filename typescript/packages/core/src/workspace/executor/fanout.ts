@@ -21,7 +21,12 @@ import { ExecutionNode } from '../types.ts'
 import { resolveAcrossMounts } from '../../commands/safeguard.ts'
 import { applyFindActions } from './find_action_dispatch.ts'
 import { rstripSlash } from '../../utils/slash.ts'
-import { fnmatch } from '../../utils/fnmatch.ts'
+import { keep } from '../../commands/builtin/findEval.ts'
+import {
+  FindParseError,
+  parseFindExpression,
+  type FindExpr,
+} from '../../commands/builtin/findParse.ts'
 
 type Result = [ByteSource | null, IOResult, ExecutionNode]
 
@@ -58,8 +63,10 @@ function adjustDepthFlags(
   const mountDepth = pathSegments(mountPrefix).length
   const delta = mountDepth - parentDepth
   const out: Record<string, string | boolean | string[]> = { ...flagKwargs }
+  const first = (v: string | boolean | string[]): string | boolean =>
+    Array.isArray(v) ? (v[0] ?? '') : v
   if ('maxdepth' in out) {
-    const orig = Number(out.maxdepth)
+    const orig = Number(first(out.maxdepth))
     if (!Number.isNaN(orig)) {
       const md = orig - delta
       if (md < 0) return null
@@ -67,7 +74,7 @@ function adjustDepthFlags(
     }
   }
   if ('mindepth' in out) {
-    const orig = Number(out.mindepth)
+    const orig = Number(first(out.mindepth))
     if (!Number.isNaN(orig)) {
       out.mindepth = String(Math.max(0, orig - delta))
     }
@@ -75,30 +82,54 @@ function adjustDepthFlags(
   return out
 }
 
+function adjustDepthTexts(
+  texts: readonly string[],
+  parentPath: string,
+  mountPrefix: string,
+): string[] {
+  const delta = pathSegments(mountPrefix).length - pathSegments(parentPath).length
+  const out = [...texts]
+  if (delta === 0) return out
+  let i = 0
+  while (i < out.length - 1) {
+    const tok = out[i]
+    if (tok === '-maxdepth' || tok === '-mindepth') {
+      const val = Number(out[i + 1])
+      if (!Number.isNaN(val)) {
+        out[i + 1] = tok === '-maxdepth' ? String(val - delta) : String(Math.max(0, val - delta))
+      }
+      i += 2
+      continue
+    }
+    i += 1
+  }
+  return out
+}
+
 function synthesizeFindMountEntries(
   targetPath: string,
   descendants: readonly Mount[],
-  flagKwargs: Record<string, string | boolean | string[]>,
+  texts: readonly string[],
 ): string {
-  const typeFilter = flagKwargs.type
-  if (typeFilter !== undefined && typeFilter !== 'd') return ''
+  let expr: FindExpr
+  try {
+    expr = parseFindExpression([...texts])
+  } catch (err) {
+    if (err instanceof FindParseError) return ''
+    throw err
+  }
+  const tree = expr.tree
+  const maxDepth = expr.maxDepth
+  const minDepth = expr.minDepth ?? 0
   const parentDepth = pathSegments(targetPath).length
-  const maxRaw = flagKwargs.maxdepth
-  const minRaw = flagKwargs.mindepth
-  const maxDepth = maxRaw !== undefined ? Number(maxRaw) : null
-  const minDepth = minRaw !== undefined ? Number(minRaw) : 0
-  const namePat = typeof flagKwargs.name === 'string' ? flagKwargs.name : null
-  const inamePat = typeof flagKwargs.iname === 'string' ? flagKwargs.iname : null
   const out: string[] = []
   for (const m of descendants) {
     const prefixNoSlash = rstripSlash(m.prefix)
     const depth = pathSegments(prefixNoSlash).length - parentDepth
-    if (depth < minDepth) continue
-    if (maxDepth !== null && !Number.isNaN(maxDepth) && depth > maxDepth) continue
+    if (maxDepth !== null && depth > maxDepth) continue
     const segs = prefixNoSlash.split('/').filter((s) => s !== '')
     const base = segs[segs.length - 1] ?? prefixNoSlash
-    if (namePat !== null && !fnmatch(base, namePat)) continue
-    if (inamePat !== null && !fnmatch(base.toLowerCase(), inamePat.toLowerCase())) continue
+    if (!keep({ key: prefixNoSlash, name: base, kind: 'd', depth }, tree, minDepth)) continue
     out.push(prefixNoSlash)
   }
   return out.join('\n')
@@ -162,13 +193,16 @@ export async function fanOutTraversal(
   for (const mount of mountsToRun) {
     let subPaths: PathSpec[]
     let subFlags: Record<string, string | boolean | string[]>
+    let subTexts: string[]
     if (mount === primaryMount) {
       subPaths = [...paths]
       subFlags = { ...flagKwargs }
+      subTexts = [...texts]
     } else {
       const adjusted = adjustDepthFlags(flagKwargs, targetPath, mount.prefix)
       if (adjusted === null) continue
       subFlags = adjusted
+      subTexts = adjustDepthTexts(texts, targetPath, mount.prefix)
       const mountRoot = rstripSlash(mount.prefix) || '/'
       subPaths = [
         new PathSpec({
@@ -188,7 +222,7 @@ export async function fanOutTraversal(
     let stdout: ByteSource | null
     let io: IOResult
     try {
-      const result = await mount.executeCmd(cmdName, subPaths, [...texts], subFlags, {
+      const result = await mount.executeCmd(cmdName, subPaths, subTexts, subFlags, {
         stdin,
         cwd,
       })
@@ -213,7 +247,7 @@ export async function fanOutTraversal(
   }
 
   if (cmdName === 'find') {
-    const synthetic = synthesizeFindMountEntries(targetPath, descendants, flagKwargs)
+    const synthetic = synthesizeFindMountEntries(targetPath, descendants, texts)
     if (synthetic !== '') allStdout.push(new TextEncoder().encode(synthetic))
   }
 

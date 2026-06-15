@@ -17,6 +17,7 @@ import { IndexType, type IndexConfig, type RedisIndexConfig } from '../cache/ind
 import { RAMIndexCacheStore } from '../cache/index/ram.ts'
 import { RedisIndexCacheStore } from '../cache/index/redis.ts'
 import type { IndexCacheStore } from '../cache/index/store.ts'
+import type { PredNode } from '../commands/builtin/findEval.ts'
 import type { RegisteredCommand } from '../commands/config.ts'
 import type { RegisteredOp } from '../ops/registry.ts'
 import type { FileStat, PathSpec } from '../types.ts'
@@ -32,6 +33,8 @@ export interface FindOptions {
   orNames?: string[] | null
   iname?: string | null
   pathPattern?: string | null
+  empty?: boolean | null
+  tree?: PredNode | null
   mtimeMin?: number | null
   mtimeMax?: number | null
 }

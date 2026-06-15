@@ -44,6 +44,7 @@ async def find(
     iname: str | None = None,
     path: str | None = None,
     mindepth: str | None = None,
+    empty: bool = False,
     index: IndexCacheStore = None,
     **_extra: object,
 ) -> tuple[ByteSource | None, IOResult]:
@@ -61,4 +62,5 @@ async def find(
                               maxdepth=maxdepth,
                               iname=iname,
                               path=path,
-                              mindepth=mindepth)
+                              mindepth=mindepth,
+                              empty=empty)

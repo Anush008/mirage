@@ -15,10 +15,11 @@
 import asyncio
 import os
 from datetime import datetime, timezone
-from fnmatch import fnmatch
 from pathlib import Path
 
 from mirage.accessor.disk import DiskAccessor
+from mirage.commands.builtin.find_eval import (FindEntry, PredNode, build_tree,
+                                               keep)
 from mirage.types import PathSpec
 
 
@@ -44,11 +45,31 @@ def _find_sync(
     iname: str | None = None,
     path_pattern: str | None = None,
     mindepth: int | None = None,
+    empty: bool = False,
+    tree: PredNode | None = None,
 ) -> list[str]:
     p = _resolve(root, path)
     base = "/" + path.strip("/")
     base_depth = 0 if base == "/" else base.count("/")
     results: list[str] = []
+    tree = tree if tree is not None else build_tree(name=name,
+                                                    iname=iname,
+                                                    path_pattern=path_pattern,
+                                                    type=type,
+                                                    name_exclude=name_exclude,
+                                                    or_names=or_names,
+                                                    empty=empty)
+
+    if base != "/" and p.is_dir():
+        root_empty = (not any(p.iterdir())) if empty else None
+        root_entry = FindEntry(key=base,
+                               name=base.rsplit("/", 1)[-1],
+                               kind="d",
+                               depth=0,
+                               is_empty=root_empty)
+        if (maxdepth is None or maxdepth >= 0) and keep(
+                root_entry, tree, mindepth):
+            results.append(base)
 
     for dirpath, dirnames, filenames in os.walk(p):
         dp = Path(dirpath)
@@ -73,32 +94,26 @@ def _find_sync(
 
         for entry_path, kind in entries:
             entry_name = entry_path.rsplit("/", 1)[-1]
-
-            if or_names:
-                if not any(fnmatch(entry_name, pat) for pat in or_names):
-                    continue
-            elif name is not None and not fnmatch(entry_name, name):
-                continue
-
-            if iname is not None and not fnmatch(entry_name.lower(),
-                                                 iname.lower()):
-                continue
-
-            if path_pattern is not None and not fnmatch(
-                    entry_path, path_pattern):
-                continue
-
-            if name_exclude is not None and fnmatch(entry_name, name_exclude):
-                continue
-
             depth = entry_path.count("/") - base_depth
             if maxdepth is not None and depth > maxdepth:
                 continue
 
-            if mindepth is not None and depth < mindepth:
+            full = root / entry_path.lstrip("/")
+            is_empty: bool | None = None
+            if empty:
+                try:
+                    is_empty = (full.stat().st_size == 0) if kind == "f" else (
+                        not any(full.iterdir()))
+                except OSError:
+                    is_empty = None
+            entry = FindEntry(key=entry_path,
+                              name=entry_name,
+                              kind=kind,
+                              depth=depth,
+                              is_empty=is_empty)
+            if not keep(entry, tree, mindepth):
                 continue
 
-            full = root / entry_path.lstrip("/")
             if kind == "f" and (min_size is not None or max_size is not None):
                 try:
                     st = full.stat()
@@ -141,6 +156,8 @@ async def find(
     iname: str | None = None,
     path_pattern: str | None = None,
     mindepth: int | None = None,
+    empty: bool = False,
+    tree: PredNode | None = None,
 ) -> list[str]:
     if isinstance(path, str):
         path = PathSpec(original=path, directory=path)
@@ -162,4 +179,6 @@ async def find(
         iname,
         path_pattern,
         mindepth,
+        empty,
+        tree,
     )

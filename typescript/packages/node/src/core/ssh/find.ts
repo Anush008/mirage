@@ -17,7 +17,7 @@ import type { PathSpec } from '@struktoai/mirage-core'
 import type { SSHAccessor } from '../../accessor/ssh.ts'
 import { isDirectoryAttrs, joinRoot, stripPrefix } from './utils.ts'
 import { norm } from '@struktoai/mirage-core'
-import { fnmatch } from '@struktoai/mirage-core'
+import { buildTree, keep, type PredNode } from '@struktoai/mirage-core'
 
 export interface FindOptions {
   name?: string | null
@@ -30,6 +30,8 @@ export interface FindOptions {
   orNames?: string[] | null
   iname?: string | null
   pathPattern?: string | null
+  empty?: boolean | null
+  tree?: PredNode | null
   mtimeMin?: number | null
   mtimeMax?: number | null
 }
@@ -39,6 +41,7 @@ interface WalkCtx {
   options: FindOptions
   results: string[]
   baseDepth: number
+  tree: PredNode
 }
 
 function isFileType(t: FindOptions['type']): boolean {
@@ -55,35 +58,17 @@ function matches(
   isDir: boolean,
   depth: number,
   opts: FindOptions,
+  tree: PredNode,
 ): boolean {
   if (opts.maxDepth !== null && opts.maxDepth !== undefined && depth > opts.maxDepth) return false
-  if (opts.minDepth !== null && opts.minDepth !== undefined && depth < opts.minDepth) return false
-  if (isFileType(opts.type) && isDir) return false
-  if (isDirType(opts.type) && !isDir) return false
   const basename = entryPath.slice(entryPath.lastIndexOf('/') + 1)
-  if (opts.orNames !== null && opts.orNames !== undefined && opts.orNames.length > 0) {
-    if (!opts.orNames.some((pat) => fnmatch(basename, pat))) return false
-  } else if (opts.name !== null && opts.name !== undefined) {
-    if (!fnmatch(basename, opts.name)) return false
-  }
+  const isEmpty = isDir ? false : entry.attrs.size === 0
   if (
-    opts.iname !== null &&
-    opts.iname !== undefined &&
-    !fnmatch(basename.toLowerCase(), opts.iname.toLowerCase())
-  ) {
-    return false
-  }
-  if (
-    opts.nameExclude !== null &&
-    opts.nameExclude !== undefined &&
-    fnmatch(basename, opts.nameExclude)
-  ) {
-    return false
-  }
-  if (
-    opts.pathPattern !== null &&
-    opts.pathPattern !== undefined &&
-    !fnmatch(entryPath, opts.pathPattern)
+    !keep(
+      { key: entryPath, name: basename, kind: isDir ? 'd' : 'f', depth, isEmpty },
+      tree,
+      opts.minDepth,
+    )
   ) {
     return false
   }
@@ -124,6 +109,27 @@ async function readRemoteDir(
   })
 }
 
+async function statRemote(
+  accessor: SSHAccessor,
+  remote: string,
+): Promise<{ isDir: boolean; size: number } | null> {
+  const sftp = await accessor.sftp()
+  return new Promise<{ isDir: boolean; size: number } | null>((resolveFn, rejectFn) => {
+    sftp.stat(remote, (err, stats) => {
+      if (err !== undefined) {
+        const code = (err as { code?: unknown }).code
+        if (code === 2) {
+          resolveFn(null)
+          return
+        }
+        rejectFn(err)
+        return
+      }
+      resolveFn({ isDir: stats.isDirectory(), size: stats.size })
+    })
+  })
+}
+
 async function walk(ctx: WalkCtx, virtual: string, depth: number): Promise<void> {
   const opts = ctx.options
   if (opts.maxDepth !== null && opts.maxDepth !== undefined && depth > opts.maxDepth) return
@@ -134,11 +140,7 @@ async function walk(ctx: WalkCtx, virtual: string, depth: number): Promise<void>
     if (entry.filename === '.' || entry.filename === '..') continue
     const childPath = virtual === '/' ? `/${entry.filename}` : `${virtual}/${entry.filename}`
     const isDir = isDirectoryAttrs(entry.attrs)
-    if (isFileType(opts.type) && isDir) {
-      await walk(ctx, childPath, depth + 1)
-      continue
-    }
-    if (matches(entry, childPath, isDir, depth + 1, opts)) {
+    if (matches(entry, childPath, isDir, depth + 1, opts, ctx.tree)) {
       ctx.results.push(childPath)
     }
     if (isDir) {
@@ -155,7 +157,41 @@ export async function find(
   const virtual = norm(stripPrefix(p))
   const results: string[] = []
   const baseDepth = (virtual.match(/\//g) ?? []).length
-  await walk({ accessor, options, results, baseDepth }, virtual, 0)
+  const typeKind: 'f' | 'd' | null = isFileType(options.type)
+    ? 'f'
+    : isDirType(options.type)
+      ? 'd'
+      : null
+  const tree =
+    options.tree ??
+    buildTree({
+      name: options.name,
+      iname: options.iname,
+      pathPattern: options.pathPattern,
+      type: typeKind,
+      nameExclude: options.nameExclude,
+      orNames: options.orNames,
+    })
+  if (virtual !== '/' && (options.maxDepth == null || options.maxDepth >= 0)) {
+    const st = await statRemote(accessor, joinRoot(accessor.config.root ?? '/', virtual))
+    if (
+      st !== null &&
+      keep(
+        {
+          key: virtual,
+          name: virtual.slice(virtual.lastIndexOf('/') + 1),
+          kind: st.isDir ? 'd' : 'f',
+          depth: 0,
+          isEmpty: st.isDir ? false : st.size === 0,
+        },
+        tree,
+        options.minDepth,
+      )
+    ) {
+      results.push(virtual)
+    }
+  }
+  await walk({ accessor, options, results, baseDepth, tree }, virtual, 0)
   results.sort()
   return results
 }

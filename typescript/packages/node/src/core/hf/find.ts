@@ -13,9 +13,11 @@
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import {
+  buildTree,
   type FindOptions,
-  fnmatch,
+  keep,
   type PathSpec,
+  type PredNode,
   rstripSlash,
   stripSlash,
 } from '@struktoai/mirage-core'
@@ -33,30 +35,14 @@ function matchesFilters(
   meta: CandidateMeta,
   baseDepth: number,
   options: FindOptions,
+  tree: PredNode,
 ): boolean {
   const entryName = entryPath.split('/').pop() ?? ''
-  if ((options.type === 'f' && kind !== 'f') || (options.type === 'd' && kind !== 'd')) {
-    return false
-  }
-  if (options.orNames !== null && options.orNames !== undefined && options.orNames.length > 0) {
-    if (!options.orNames.some((pat) => fnmatch(entryName, pat))) return false
-  } else if (options.name !== null && options.name !== undefined) {
-    if (!fnmatch(entryName, options.name)) return false
-  }
-  if (options.iname !== null && options.iname !== undefined) {
-    if (!fnmatch(entryName.toLowerCase(), options.iname.toLowerCase())) return false
-  }
-  if (options.pathPattern !== null && options.pathPattern !== undefined) {
-    if (!fnmatch(entryPath, options.pathPattern)) return false
-  }
-  if (options.nameExclude !== null && options.nameExclude !== undefined) {
-    if (fnmatch(entryName, options.nameExclude)) return false
-  }
   const depth = (entryPath.match(/\//g) ?? []).length - baseDepth
   if (options.maxDepth !== null && options.maxDepth !== undefined && depth > options.maxDepth) {
     return false
   }
-  if (options.minDepth !== null && options.minDepth !== undefined && depth < options.minDepth) {
+  if (!keep({ key: entryPath, name: entryName, kind, depth }, tree, options.minDepth)) {
     return false
   }
   if (kind === 'f' && (options.minSize !== null || options.maxSize !== null)) {
@@ -103,6 +89,17 @@ export async function find(
   const op = await accessor.operator()
   const results: string[] = []
   const seenDirs = new Set<string>()
+  let sawDescendant = false
+  const tree =
+    options.tree ??
+    buildTree({
+      name: options.name,
+      iname: options.iname,
+      pathPattern: options.pathPattern,
+      type: options.type,
+      nameExclude: options.nameExclude,
+      orNames: options.orNames,
+    })
   let entries
   try {
     entries = await op.list(scanPath, { recursive: true })
@@ -116,6 +113,7 @@ export async function find(
     const meta = entry.metadata()
     const isDir = rel.endsWith('/') || meta.isDirectory()
     const entryPath = `/${stripSlash(rel)}`
+    if (entryPath !== base) sawDescendant = true
     const kind: 'f' | 'd' = isDir ? 'd' : 'f'
     const length = meta.contentLength
     const lm = meta.lastModified
@@ -135,9 +133,14 @@ export async function find(
       }
     }
     for (const [ep, k] of fileEntries) {
-      if (matchesFilters(ep, k, candidateMeta, baseDepth, options)) {
+      if (matchesFilters(ep, k, candidateMeta, baseDepth, options, tree)) {
         results.push(ep)
       }
+    }
+  }
+  if (base !== '/' && sawDescendant && (options.maxDepth == null || options.maxDepth >= 0)) {
+    if (matchesFilters(base, 'd', { size: 0, mtime: null }, baseDepth, options, tree)) {
+      results.push(base)
     }
   }
   return [...new Set(results)].sort()

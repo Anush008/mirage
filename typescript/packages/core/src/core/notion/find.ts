@@ -19,7 +19,7 @@ import type { NotionStatAccessor } from './stat.ts'
 import { readdir } from './readdir.ts'
 import { stat } from './stat.ts'
 import { stripSlash } from '../../utils/slash.ts'
-import { fnmatch } from '../../utils/fnmatch.ts'
+import { buildTree, keep } from '../../commands/builtin/findEval.ts'
 
 async function collect(
   accessor: NotionStatAccessor,
@@ -53,6 +53,16 @@ export async function find(
   const collected: [string, FileStat][] = []
   await collect(accessor, path, index, collected)
   const results: string[] = []
+  const tree =
+    options.tree ??
+    buildTree({
+      name: options.name,
+      iname: options.iname,
+      pathPattern: options.pathPattern,
+      type: options.type,
+      nameExclude: options.nameExclude,
+      orNames: options.orNames,
+    })
   for (const [entryPath, fileStat] of collected) {
     let rel = entryPath
     if (path.prefix !== '' && rel.startsWith(path.prefix)) {
@@ -61,29 +71,14 @@ export async function find(
     const relStripped = stripSlash(rel)
     rel = relStripped !== '' ? `/${relStripped}` : '/'
     const isDir = fileStat.type === FileType.DIRECTORY
-    if (options.type === 'f' && isDir) continue
-    if (options.type === 'd' && !isDir) continue
     const entryName = rel.split('/').pop() ?? rel
-    const orNames = options.orNames ?? null
-    if (orNames !== null && orNames.length > 0) {
-      if (!orNames.some((pat) => fnmatch(entryName, pat))) continue
-    } else if (options.name !== undefined && options.name !== null) {
-      if (!fnmatch(entryName, options.name)) continue
-    }
-    if (options.iname !== undefined && options.iname !== null) {
-      if (!fnmatch(entryName.toLowerCase(), options.iname.toLowerCase())) continue
-    }
-    if (options.pathPattern !== undefined && options.pathPattern !== null) {
-      if (!fnmatch(rel, options.pathPattern)) continue
-    }
-    if (options.nameExclude !== undefined && options.nameExclude !== null) {
-      if (fnmatch(entryName, options.nameExclude)) continue
-    }
     const depth = rel === base ? 0 : (rel.match(/\//g) ?? []).length - baseDepth
     if (options.maxDepth !== undefined && options.maxDepth !== null && depth > options.maxDepth) {
       continue
     }
-    if (options.minDepth !== undefined && options.minDepth !== null && depth < options.minDepth) {
+    if (
+      !keep({ key: rel, name: entryName, kind: isDir ? 'd' : 'f', depth }, tree, options.minDepth)
+    ) {
       continue
     }
     if (!isDir && (options.minSize != null || options.maxSize != null)) {

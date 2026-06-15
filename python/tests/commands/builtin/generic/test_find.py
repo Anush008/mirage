@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from mirage.commands.builtin.find_eval import Name, Not, Or
 from mirage.commands.builtin.generic.find import (FindArgs, apply_mount_prefix,
                                                   apply_mtime_filter,
                                                   parse_find_args, walk_find)
@@ -83,15 +84,14 @@ def test_parse_find_args_unknown_type_left_as_string():
     assert parse_find_args((), type="symlink").type == "symlink"
 
 
-def test_parse_find_args_extracts_not_name_from_texts():
+def test_parse_find_args_negation_builds_not_tree():
     args = parse_find_args(("-not", "-name", "*.pyc"))
-    assert args.name_exclude == "*.pyc"
+    assert args.tree == Not(Name("*.pyc"))
 
 
-def test_parse_find_args_extracts_or_names_only_when_multiple():
-    """Single `-name` gets a None or_names list (means: just use args.name)."""
-    args = parse_find_args(("-or", "-name", "*.py"), name="*.txt")
-    assert args.or_names == ["*.txt", "*.py"]
+def test_parse_find_args_or_builds_or_tree():
+    args = parse_find_args(("-name", "*.txt", "-o", "-name", "*.py"))
+    assert args.tree == Or([Name("*.txt"), Name("*.py")])
 
 
 def test_parse_find_args_or_names_none_when_only_one_name():
