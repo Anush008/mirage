@@ -34,8 +34,8 @@ def resolve_within_root(root: str | Path, user_path: str) -> Path:
         Path: the resolved absolute path, guaranteed to be root itself
             or a descendant of root.
     """
-    resolved_root = os.path.abspath(str(root))
-    resolved = os.path.abspath(os.path.join(resolved_root, user_path))
+    resolved_root = os.path.realpath(str(root))
+    resolved = os.path.realpath(os.path.join(resolved_root, user_path))
     if resolved != resolved_root and not resolved.startswith(resolved_root +
                                                              os.sep):
         raise PathOutsideRootError(
