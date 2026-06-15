@@ -83,16 +83,16 @@ async def find(
     p0 = paths[0]
     root = p0.original
     pfx = p0.prefix
+    max_depth_val = (_parse_depth(maxdepth, "-maxdepth")
+                     if maxdepth is not None else None)
+    min_depth_val = (_parse_depth(mindepth, "-mindepth")
+                     if mindepth is not None else None)
     all_paths = await _walk(accessor, p0, index)
     stripped_root = root
     if pfx and stripped_root.startswith(pfx):
         stripped_root = stripped_root[len(pfx):] or "/"
     root_depth = stripped_root.strip("/").count("/") if stripped_root.strip(
         "/") else 0
-    max_depth_val = (_parse_depth(maxdepth, "-maxdepth")
-                     if maxdepth is not None else None)
-    min_depth_val = (_parse_depth(mindepth, "-mindepth")
-                     if mindepth is not None else None)
     wanted_type = {"d": FileType.DIRECTORY, "f": None}.get(type)
     results: list[str] = []
     for entry_path in all_paths:
