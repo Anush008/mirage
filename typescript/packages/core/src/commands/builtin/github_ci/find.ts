@@ -18,6 +18,7 @@ import { readdir as ciReaddir } from '../../../core/github_ci/readdir.ts'
 import { IOResult, type ByteSource } from '../../../io/types.ts'
 import { PathSpec, ResourceName } from '../../../types.ts'
 import { command, type CommandFnResult, type CommandOpts } from '../../config.ts'
+import { invalidFindArg } from '../generic/find.ts'
 import { specOf } from '../../spec/builtins.ts'
 import { metadataProvision } from './provision.ts'
 import { stripSlash } from '../../../utils/slash.ts'
@@ -79,6 +80,10 @@ async function findCommand(
   const minDepthRaw = typeof opts.flags.mindepth === 'string' ? opts.flags.mindepth : null
   const maxDepth = maxDepthRaw !== null ? Number.parseInt(maxDepthRaw, 10) : null
   const minDepth = minDepthRaw !== null ? Number.parseInt(minDepthRaw, 10) : null
+  if (maxDepthRaw !== null && Number.isNaN(maxDepth))
+    return invalidFindArg(maxDepthRaw, '-maxdepth')
+  if (minDepthRaw !== null && Number.isNaN(minDepth))
+    return invalidFindArg(minDepthRaw, '-mindepth')
 
   const allPaths = await walk(accessor, p0, opts.index, maxDepth, 0)
   const searchKey = stripSlash(p0.stripPrefix)

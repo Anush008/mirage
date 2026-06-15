@@ -71,4 +71,22 @@ describe('discord find', () => {
     expect(lines).toContain('/mnt/discord/My Server__G1/channels/general__C1/2024-01-01/chat.jsonl')
     expect(lines).toContain('/mnt/discord/My Server__G1/channels/general__C1/2024-01-02/chat.jsonl')
   })
+
+  it('exits 1 with a clean error for an invalid -maxdepth', async () => {
+    const cmd = DISCORD_FIND[0]
+    if (cmd === undefined) throw new Error('find not registered')
+    const resource = makeFakeResource(new FakeDiscordTransport())
+    const result = await cmd.fn(
+      resource.accessor,
+      [new PathSpec({ original: '/mnt/discord', directory: '/mnt/discord', resolved: false })],
+      [],
+      { stdin: null, flags: { maxdepth: 'abc' }, filetypeFns: null, cwd: '/', resource },
+    )
+    expect(result).not.toBeNull()
+    const [out, io] = result as [unknown, { exitCode: number; stderr: AsyncIterable<Uint8Array> }]
+    expect(out).toBeNull()
+    expect(io.exitCode).toBe(1)
+    const buf = io.stderr instanceof Uint8Array ? io.stderr : await materialize(io.stderr)
+    expect(DEC.decode(buf)).toBe("find: invalid argument 'abc' to '-maxdepth'\n")
+  })
 })

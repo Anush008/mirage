@@ -19,6 +19,7 @@ import { readdir as trelloReaddir } from '../../../core/trello/readdir.ts'
 import { IOResult, type ByteSource } from '../../../io/types.ts'
 import { PathSpec, ResourceName } from '../../../types.ts'
 import { command, type CommandFnResult, type CommandOpts } from '../../config.ts'
+import { invalidFindArg } from '../generic/find.ts'
 import { specOf } from '../../spec/builtins.ts'
 import { metadataProvision } from './_provision.ts'
 import { stripSlash } from '../../../utils/slash.ts'
@@ -72,6 +73,8 @@ async function findCommand(
   const minDepthFlag = typeof opts.flags.mindepth === 'string' ? opts.flags.mindepth : null
   const md = maxDepthFlag !== null ? Number.parseInt(maxDepthFlag, 10) : null
   const mdMin = minDepthFlag !== null ? Number.parseInt(minDepthFlag, 10) : null
+  if (maxDepthFlag !== null && Number.isNaN(md)) return invalidFindArg(maxDepthFlag, '-maxdepth')
+  if (minDepthFlag !== null && Number.isNaN(mdMin)) return invalidFindArg(minDepthFlag, '-mindepth')
   const searchSpec = new PathSpec({
     original: searchPath,
     directory: searchPath,

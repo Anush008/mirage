@@ -21,6 +21,16 @@ import { rstripSlash } from '../../../utils/slash.ts'
 
 const ENC = new TextEncoder()
 
+export function invalidFindArg(value: string, flag: string): CommandFnResult {
+  return [
+    null,
+    new IOResult({
+      exitCode: 1,
+      stderr: ENC.encode(`find: invalid argument '${value}' to '${flag}'\n`),
+    }),
+  ]
+}
+
 function parseSize(spec: string): [number | null, number | null] {
   const suffixes: Record<string, number> = { c: 1, k: 1024, M: 1024 ** 2, G: 1024 ** 3 }
   const sign = spec.startsWith('+') ? '+' : spec.startsWith('-') ? '-' : ''
@@ -98,15 +108,7 @@ export async function findGeneric(
   else if (sizeFlag !== null && (isNan(minSize) || isNan(maxSize))) badArg = [sizeFlag, '-size']
   else if (mtimeFlag !== null && (isNan(mtimeMin) || isNan(mtimeMax)))
     badArg = [mtimeFlag, '-mtime']
-  if (badArg !== null) {
-    return [
-      null,
-      new IOResult({
-        exitCode: 1,
-        stderr: ENC.encode(`find: invalid argument '${badArg[0]}' to '${badArg[1]}'\n`),
-      }),
-    ]
-  }
+  if (badArg !== null) return invalidFindArg(badArg[0], badArg[1])
   const nameExclude = extractNotName(texts)
   const orNames = extractOrNames(nameFlag, texts)
   const matches: string[] = []

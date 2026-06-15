@@ -16,6 +16,7 @@ import fnmatch
 
 from mirage.accessor.linear import LinearAccessor
 from mirage.cache.index import IndexCacheStore
+from mirage.commands.builtin.find_helper import _parse_depth
 from mirage.commands.builtin.linear._provision import metadata_provision
 from mirage.commands.builtin.utils.output import format_records
 from mirage.commands.registry import command
@@ -88,8 +89,10 @@ async def find(
         stripped_root = stripped_root[len(pfx):] or "/"
     root_depth = stripped_root.strip("/").count("/") if stripped_root.strip(
         "/") else 0
-    max_depth_val = int(maxdepth) if maxdepth is not None else None
-    min_depth_val = int(mindepth) if mindepth is not None else None
+    max_depth_val = (_parse_depth(maxdepth, "-maxdepth")
+                     if maxdepth is not None else None)
+    min_depth_val = (_parse_depth(mindepth, "-mindepth")
+                     if mindepth is not None else None)
     wanted_type = {"d": FileType.DIRECTORY, "f": None}.get(type)
     results: list[str] = []
     for entry_path in all_paths:
