@@ -12,8 +12,11 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-export const ENV_ALLOWED_HOSTS = 'MIRAGE_ALLOWED_HOSTS'
-export const ENV_DAEMON_PORT = 'MIRAGE_DAEMON_PORT'
-export const ENV_IDLE_GRACE_SECONDS = 'MIRAGE_IDLE_GRACE_SECONDS'
-export const ENV_VERSION_ROOT = 'MIRAGE_VERSION_ROOT'
-export const ENV_SNAPSHOT_ROOT = 'MIRAGE_SNAPSHOT_ROOT'
+export function escapeHtml(s: string): string {
+  return s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}

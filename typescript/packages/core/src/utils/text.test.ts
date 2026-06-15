@@ -12,8 +12,19 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-export const ENV_ALLOWED_HOSTS = 'MIRAGE_ALLOWED_HOSTS'
-export const ENV_DAEMON_PORT = 'MIRAGE_DAEMON_PORT'
-export const ENV_IDLE_GRACE_SECONDS = 'MIRAGE_IDLE_GRACE_SECONDS'
-export const ENV_VERSION_ROOT = 'MIRAGE_VERSION_ROOT'
-export const ENV_SNAPSHOT_ROOT = 'MIRAGE_SNAPSHOT_ROOT'
+import { describe, expect, it } from 'vitest'
+import { rstripNewlines } from './text.ts'
+
+describe('rstripNewlines', () => {
+  const SAMPLES = ['', 'a', 'a\n', 'a\n\n\n', '\n\n', 'a\nb\n', 'line1\nline2', '\n\na\n']
+
+  it('matches .replace(/\\n+$/, "") for representative inputs', () => {
+    for (const s of SAMPLES) expect(rstripNewlines(s)).toBe(s.replace(/\n+$/, ''))
+  })
+
+  it('only strips trailing newlines, not interior or other whitespace', () => {
+    expect(rstripNewlines('a\nb\n\n')).toBe('a\nb')
+    expect(rstripNewlines('a \n')).toBe('a ')
+    expect(rstripNewlines('a\t')).toBe('a\t')
+  })
+})

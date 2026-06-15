@@ -16,6 +16,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import Fastify from 'fastify'
 import multipart from '@fastify/multipart'
+import rateLimit from '@fastify/rate-limit'
 import { WorkspaceRegistry } from './registry.ts'
 import { JobTable } from './jobs.ts'
 import type { AuthConfig } from './auth/index.ts'
@@ -35,6 +36,7 @@ export interface BuildAppOptions {
   allowedHosts?: readonly string[]
   authConfig?: AuthConfig
   versionRoot?: string
+  snapshotRoot?: string
 }
 
 export type MirageApp = ReturnType<typeof buildApp>
@@ -56,7 +58,13 @@ export function buildApp(options: BuildAppOptions = {}) {
   const versionBackend = new LocalBackend(
     options.versionRoot ?? join(homedir(), '.mirage', 'repos'),
   )
+  const snapshotRoot = options.snapshotRoot ?? join(homedir(), '.mirage', 'snapshots')
   const app = Fastify({ logger: false })
+  void app.register(rateLimit, {
+    global: true,
+    max: 1000,
+    timeWindow: '1 minute',
+  })
   const allowedHosts = resolveAllowedHosts(options.allowedHosts)
   if (!allowedHosts.includes('*')) {
     app.addHook('onRequest', (request, reply, done) => {
@@ -76,7 +84,7 @@ export function buildApp(options: BuildAppOptions = {}) {
     limits: { fileSize: 10 * 1024 * 1024 * 1024 },
   })
   registerHealthRoutes(app, { registry, startedAt, exit: exitFn })
-  registerWorkspacesRoutes(app, { registry })
+  registerWorkspacesRoutes(app, { registry, snapshotRoot })
   registerVersionsRoutes(app, { registry, versionBackend })
   registerSessionsRoutes(app, { registry })
   registerExecuteRoutes(app, { registry, jobs })

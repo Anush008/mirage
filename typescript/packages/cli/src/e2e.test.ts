@@ -136,6 +136,7 @@ describe('mirage CLI end-to-end', () => {
     tmp = mkdtempSync(join(tmpdir(), 'mirage-e2e-'))
     env = cliEnv()
     env.MIRAGE_VERSION_ROOT = join(tmp, 'repos')
+    env.MIRAGE_SNAPSHOT_ROOT = tmp
   })
 
   afterAll(async () => {

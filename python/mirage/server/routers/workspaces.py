@@ -12,7 +12,6 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -20,6 +19,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from mirage import Workspace
 from mirage.resource.registry import build_resource
 from mirage.server.clone import clone_workspace_with_override
+from mirage.server.paths import PathOutsideRootError, resolve_within_root
 from mirage.server.summary import make_brief, make_detail
 from mirage.workspace.snapshot.utils import norm_mount_prefix
 
@@ -102,7 +102,10 @@ async def snapshot_workspace(workspace_id: str, req: SnapshotWorkspaceRequest,
     if workspace_id not in registry:
         raise HTTPException(status_code=404, detail="workspace not found")
     entry = registry.get(workspace_id)
-    target = Path(req.path)
+    try:
+        target = resolve_within_root(request.app.state.snapshot_root, req.path)
+    except PathOutsideRootError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     target.parent.mkdir(parents=True, exist_ok=True)
     await entry.runner.call(_run_snapshot(entry.runner.ws, str(target)))
     return SnapshotWorkspaceResponse(id=workspace_id,
@@ -118,12 +121,17 @@ async def _run_snapshot(ws: Workspace, target: str) -> None:
 async def load_workspace(req: LoadWorkspaceRequest,
                          request: Request) -> WorkspaceDetail:
     registry = request.app.state.registry
+    try:
+        safe_path = resolve_within_root(request.app.state.snapshot_root,
+                                        req.path)
+    except PathOutsideRootError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if req.id is not None and req.id in registry:
         raise HTTPException(status_code=409,
                             detail=f"workspace id already exists: {req.id!r}")
     resources = _build_load_resources(req.override)
     try:
-        ws = Workspace.load(req.path, resources=resources)
+        ws = Workspace.load(str(safe_path), resources=resources)
     except FileNotFoundError:
         raise HTTPException(status_code=400,
                             detail=f"snapshot not found: {req.path}")

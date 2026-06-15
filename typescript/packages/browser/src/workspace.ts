@@ -44,7 +44,11 @@ function randomSessionId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }
-  return `session-${String(Date.now())}-${Math.random().toString(36).slice(2, 10)}`
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  let hex = ''
+  for (const b of bytes) hex += b.toString(16).padStart(2, '0')
+  return `session-${hex}`
 }
 
 export class Workspace extends CoreWorkspace {

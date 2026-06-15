@@ -31,6 +31,7 @@
  *  4. Open http://localhost:5173/gdrive_pkce.html
  */
 import { GDriveResource, MountMode, Workspace } from '@struktoai/mirage-browser'
+import { escapeHtml } from './html.ts'
 
 declare const __GOOGLE_CLIENT_ID__: string
 declare const __GOOGLE_CLIENT_SECRET__: string
@@ -222,7 +223,7 @@ async function main(): Promise<void> {
   const errParam = url.searchParams.get('error')
 
   if (errParam !== null) {
-    setStatus(`<span class="err">Google declined the consent: ${errParam}</span>`)
+    setStatus(`<span class="err">Google declined the consent: ${escapeHtml(errParam)}</span>`)
     return
   }
 
@@ -234,7 +235,9 @@ async function main(): Promise<void> {
       // Strip ?code= so a reload doesn't try to re-exchange a one-time code.
       window.history.replaceState({}, document.title, '/gdrive_pkce.html')
     } catch (err) {
-      setStatus(`<span class="err">${err instanceof Error ? err.message : String(err)}</span>`)
+      setStatus(
+        `<span class="err">${escapeHtml(err instanceof Error ? err.message : String(err))}</span>`,
+      )
       return
     }
   }

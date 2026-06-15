@@ -131,7 +131,7 @@ describe('workspaces router', () => {
   it('POST /v1/workspaces/:id/snapshot writes a tar to the path and load round-trips', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'mirage-ws-'))
     const tar = join(dir, 'seed.tar')
-    const app1 = buildApp()
+    const app1 = buildApp({ snapshotRoot: dir })
     try {
       await app1.inject({
         method: 'POST',
@@ -149,7 +149,7 @@ describe('workspaces router', () => {
       expect(snapBody.size).toBeGreaterThan(0)
       expect(existsSync(tar)).toBe(true)
 
-      const app2 = buildApp()
+      const app2 = buildApp({ snapshotRoot: dir })
       try {
         const res = await app2.inject({
           method: 'POST',
@@ -164,6 +164,42 @@ describe('workspaces router', () => {
     } finally {
       await app1.close().catch(() => undefined)
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('POST /v1/workspaces/:id/snapshot rejects a path outside the snapshot root', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mirage-ws-'))
+    const app = buildApp({ snapshotRoot: dir })
+    try {
+      await app.inject({
+        method: 'POST',
+        url: '/v1/workspaces',
+        payload: { id: 'esc', config: { mounts: { '/': { resource: 'ram', mode: 'write' } } } },
+      })
+      const res = await app.inject({
+        method: 'POST',
+        url: '/v1/workspaces/esc/snapshot',
+        payload: { path: '../escape.tar' },
+      })
+      expect(res.statusCode).toBe(400)
+      expect(existsSync(join(dir, '..', 'escape.tar'))).toBe(false)
+    } finally {
+      await app.close().catch(() => undefined)
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('POST /v1/workspaces rejects a non-object config', async () => {
+    const app = buildApp()
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/v1/workspaces',
+        payload: { config: '/etc/passwd' },
+      })
+      expect(res.statusCode).toBe(400)
+    } finally {
+      await app.close().catch(() => undefined)
     }
   })
 
@@ -184,7 +220,7 @@ describe('workspaces router', () => {
   it('POST /v1/workspaces/load returns 409 on id conflict', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'mirage-ws-'))
     const tar = join(dir, 'taken.tar')
-    const app = buildApp()
+    const app = buildApp({ snapshotRoot: dir })
     try {
       await app.inject({
         method: 'POST',
