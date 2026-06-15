@@ -16,8 +16,6 @@ import type { Workspace } from '@struktoai/mirage-core'
 
 export const MIRAGE_SYSTEM_PROMPT = `Your filesystem is powered by Mirage — a virtual filesystem that mounts cloud storage, local files, and in-memory data as a unified file tree.
 
-All file paths live under /mirage/. Do not access paths outside this folder.
-
 Capabilities beyond standard filesystem:
 - cat on .parquet, .orc, .feather files returns a formatted table
 - head -n 5 on data files returns the first 5 rows/seconds
