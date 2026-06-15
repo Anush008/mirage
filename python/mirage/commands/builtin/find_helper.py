@@ -29,6 +29,13 @@ def _parse_depth(value: str, flag: str) -> int:
             f"find: invalid argument '{value}' to '{flag}'") from None
 
 
+def _validate_size_mtime(size: str | None, mtime: str | None) -> None:
+    if size is not None:
+        _parse_size(size)
+    if mtime is not None:
+        _parse_mtime(mtime)
+
+
 def _parse_size(spec: str) -> tuple[int | None, int | None]:
     suffixes = {"c": 1, "k": 1024, "M": 1024**2, "G": 1024**3}
     if spec.startswith(("+", "-")):

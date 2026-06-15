@@ -16,7 +16,8 @@ import fnmatch
 
 from mirage.accessor.slack import SlackAccessor
 from mirage.cache.index import IndexCacheStore
-from mirage.commands.builtin.find_helper import _parse_depth
+from mirage.commands.builtin.find_helper import (_parse_depth,
+                                                 _validate_size_mtime)
 from mirage.commands.builtin.slack._provision import metadata_provision
 from mirage.commands.builtin.utils.output import format_records
 from mirage.commands.registry import command
@@ -95,6 +96,7 @@ async def find(
     md = _parse_depth(maxdepth, "-maxdepth") if maxdepth is not None else None
     md_min = (_parse_depth(mindepth, "-mindepth")
               if mindepth is not None else None)
+    _validate_size_mtime(size, mtime)
 
     search_spec = PathSpec(original=search_path,
                            directory=search_path,

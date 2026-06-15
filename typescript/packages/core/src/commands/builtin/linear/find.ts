@@ -19,7 +19,7 @@ import { readdir as linearReaddir } from '../../../core/linear/readdir.ts'
 import { IOResult, type ByteSource } from '../../../io/types.ts'
 import { PathSpec, ResourceName } from '../../../types.ts'
 import { command, type CommandFnResult, type CommandOpts } from '../../config.ts'
-import { invalidFindArg } from '../generic/find.ts'
+import { findSizeMtimeError, invalidFindArg } from '../generic/find.ts'
 import { specOf } from '../../spec/builtins.ts'
 import { metadataProvision } from './_provision.ts'
 import { stripSlash } from '../../../utils/slash.ts'
@@ -75,6 +75,10 @@ async function findCommand(
   const mdMin = minDepthFlag !== null ? Number.parseInt(minDepthFlag, 10) : null
   if (maxDepthFlag !== null && Number.isNaN(md)) return invalidFindArg(maxDepthFlag, '-maxdepth')
   if (minDepthFlag !== null && Number.isNaN(mdMin)) return invalidFindArg(minDepthFlag, '-mindepth')
+  const sizeFlag = typeof opts.flags.size === 'string' ? opts.flags.size : null
+  const mtimeFlag = typeof opts.flags.mtime === 'string' ? opts.flags.mtime : null
+  const sizeMtimeErr = findSizeMtimeError(sizeFlag, mtimeFlag)
+  if (sizeMtimeErr !== null) return sizeMtimeErr
   const searchSpec = new PathSpec({
     original: searchPath,
     directory: searchPath,

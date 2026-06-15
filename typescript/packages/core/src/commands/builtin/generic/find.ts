@@ -53,6 +53,26 @@ function parseMtime(spec: string): [number | null, number | null] {
   return [now - (n + 1) * day, now - n * day]
 }
 
+const nan = (v: number | null): boolean => v !== null && Number.isNaN(v)
+
+// Reject malformed -size/-mtime on backends that do not implement those
+// predicates, so a typo errors instead of being silently ignored. Returns the
+// exit-1 result on bad input, else null.
+export function findSizeMtimeError(
+  sizeFlag: string | null,
+  mtimeFlag: string | null,
+): CommandFnResult | null {
+  if (sizeFlag !== null) {
+    const [lo, hi] = parseSize(sizeFlag)
+    if (nan(lo) || nan(hi)) return invalidFindArg(sizeFlag, '-size')
+  }
+  if (mtimeFlag !== null) {
+    const [lo, hi] = parseMtime(mtimeFlag)
+    if (nan(lo) || nan(hi)) return invalidFindArg(mtimeFlag, '-mtime')
+  }
+  return null
+}
+
 function extractNotName(texts: readonly string[]): string | null {
   for (let i = 0; i < texts.length; i++) {
     const pat = texts[i + 2]

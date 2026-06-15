@@ -13,10 +13,15 @@
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import {
+  DatabricksVolumeResource,
   DiscordResource,
   EmailResource,
+  GDocsResource,
+  GDriveResource,
   GitHubCIResource,
   GmailResource,
+  GSheetsResource,
+  GSlidesResource,
   LangfuseResource,
   LinearResource,
   MountMode,
@@ -28,6 +33,11 @@ import {
 
 function resources(): Array<readonly [string, string, Resource]> {
   return [
+    [
+      "databricks",
+      "/databricks",
+      new DatabricksVolumeResource({ catalog: "c", schema: "s", volume: "v", rootPath: "/" }),
+    ],
     ["discord", "/discord", new DiscordResource({ token: "x" })],
     [
       "email",
@@ -43,8 +53,12 @@ function resources(): Array<readonly [string, string, Resource]> {
         maxMessages: 200,
       }),
     ],
+    ["gdocs", "/gdocs", new GDocsResource({ clientId: "c", refreshToken: "r" })],
+    ["gdrive", "/gdrive", new GDriveResource({ clientId: "c", refreshToken: "r" })],
     ["github_ci", "/github_ci", new GitHubCIResource({ token: "t", owner: "o", repo: "r" })],
     ["gmail", "/gmail", new GmailResource({ clientId: "c", refreshToken: "r" })],
+    ["gsheets", "/gsheets", new GSheetsResource({ clientId: "c", refreshToken: "r" })],
+    ["gslides", "/gslides", new GSlidesResource({ clientId: "c", refreshToken: "r" })],
     ["langfuse", "/langfuse", new LangfuseResource({ publicKey: "p", secretKey: "s" })],
     ["linear", "/linear", new LinearResource({ apiKey: "k" })],
     ["slack", "/slack", new SlackResource({ token: "x" })],
@@ -52,11 +66,16 @@ function resources(): Array<readonly [string, string, Resource]> {
   ];
 }
 
-// Invalid -maxdepth/-mindepth must be rejected during flag parsing, before any
-// network call, identically on every backend. Cross-checked py vs ts.
+// Invalid -maxdepth/-mindepth/-size/-mtime must be rejected during flag
+// parsing, before any network call, identically on every backend.
+// Cross-checked py vs ts. (github needs a live repo at construct, notion needs
+// an OAuth provider, hf_buckets validates the bucket id, onedrive is py-only —
+// all excluded from this cred-free cross-language suite.)
 const ARG_ERROR_CASES: ReadonlyArray<readonly [string, string]> = [
   ["maxdepth", "-maxdepth abc"],
   ["mindepth", "-mindepth xx"],
+  ["size", "-size abc"],
+  ["mtime", "-mtime abc"],
 ];
 
 async function main(): Promise<void> {

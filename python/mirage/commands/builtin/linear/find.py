@@ -16,7 +16,8 @@ import fnmatch
 
 from mirage.accessor.linear import LinearAccessor
 from mirage.cache.index import IndexCacheStore
-from mirage.commands.builtin.find_helper import _parse_depth
+from mirage.commands.builtin.find_helper import (_parse_depth,
+                                                 _validate_size_mtime)
 from mirage.commands.builtin.linear._provision import metadata_provision
 from mirage.commands.builtin.utils.output import format_records
 from mirage.commands.registry import command
@@ -87,6 +88,7 @@ async def find(
                      if maxdepth is not None else None)
     min_depth_val = (_parse_depth(mindepth, "-mindepth")
                      if mindepth is not None else None)
+    _validate_size_mtime(size, mtime)
     all_paths = await _walk(accessor, p0, index)
     stripped_root = root
     if pfx and stripped_root.startswith(pfx):
