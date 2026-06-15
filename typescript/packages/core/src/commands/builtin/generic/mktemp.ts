@@ -42,10 +42,13 @@ export async function mktempGeneric(
   const parent = tFlag ? '/tmp' : typeof opts.flags.p === 'string' ? opts.flags.p : '/tmp'
   const templateArg = texts[0]
   const template = templateArg !== undefined && templateArg !== '' ? templateArg : 'tmp.XXXXXXXXXX'
-  const xRun = /X+$/.exec(template)
+  let xCount = 0
+  while (xCount < template.length && template.charCodeAt(template.length - 1 - xCount) === 88) {
+    xCount += 1
+  }
   let name: string
-  if (xRun !== null) {
-    name = template.slice(0, xRun.index) + randomSuffix(xRun[0].length)
+  if (xCount > 0) {
+    name = template.slice(0, template.length - xCount) + randomSuffix(xCount)
   } else {
     name = `${template}.${randomSuffix(8)}`
   }

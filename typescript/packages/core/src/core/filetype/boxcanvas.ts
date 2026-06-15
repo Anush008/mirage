@@ -12,6 +12,8 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import { rstripNewlines } from '../../utils/text.ts'
+
 const ENC = new TextEncoder()
 const DEC = new TextDecoder('utf-8')
 
@@ -100,7 +102,7 @@ export function processBoxcanvas(rawBytes: Uint8Array): Uint8Array {
     if (typeof w.lastModifiedBy === 'string' && w.lastModifiedBy !== '') {
       authors.add(w.lastModifiedBy)
     }
-    const widgetText = extractText(w.data?.content).replace(/\n+$/, '')
+    const widgetText = rstripNewlines(extractText(w.data?.content))
     if (widgetText !== '') bodyParts.push(widgetText)
     processed.push({
       id: w.id ?? '',

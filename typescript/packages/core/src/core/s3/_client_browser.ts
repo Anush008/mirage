@@ -17,11 +17,11 @@ import type { S3Module, S3SendClient } from './_client.ts'
 
 function decodeEntities(s: string): string {
   return s
-    .replaceAll('&amp;', '&')
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
     .replaceAll('&quot;', '"')
     .replaceAll('&apos;', "'")
+    .replaceAll('&amp;', '&')
 }
 
 function tagText(xml: string, tag: string): string | null {

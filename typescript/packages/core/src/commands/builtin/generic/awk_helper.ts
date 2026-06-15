@@ -195,7 +195,7 @@ export function evalAccumulator(
 ): void {
   for (const rawStmt of action.split(';')) {
     const stmt = rawStmt.trim()
-    const m = /(\w+)\s*\+=\s*(.+)/.exec(stmt)
+    const m = /^(\w+)\s*\+=\s*(.+)/.exec(stmt)
     if (m !== null) {
       const variable = m[1] ?? ''
       const expr = (m[2] ?? '').trim()

@@ -13,6 +13,7 @@
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import { formatWcLines, type WcRow } from './generic/wc.ts'
+import { rstripNewlines } from '../../utils/text.ts'
 
 export type AggregateResult = [path: string, data: Uint8Array]
 
@@ -44,7 +45,7 @@ export function prefixAggregate(results: AggregateResult[]): Uint8Array {
   const lines: string[] = []
   for (const [path, data] of results) {
     if (data.byteLength === 0) continue
-    const text = dec.decode(data).replace(/\n+$/, '')
+    const text = rstripNewlines(dec.decode(data))
     for (const line of text.split('\n')) {
       lines.push(results.length > 1 ? `${path}:${line}` : line)
     }
