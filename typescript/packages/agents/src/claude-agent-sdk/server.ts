@@ -139,6 +139,7 @@ export function MirageServer(workspace: Workspace) {
   return createSdkMcpServer({
     name: 'mirage',
     version: VERSION,
+    alwaysLoad: true,
     tools: [
       tool('execute_command', EXECUTE_DESCRIPTION, { command: z.string() }, (args) =>
         runExecute(workspace, args.command),
