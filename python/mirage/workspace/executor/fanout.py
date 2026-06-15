@@ -12,8 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import fnmatch
-
+from mirage.commands.builtin.find_eval import FindEntry, keep
+from mirage.commands.builtin.find_parse import parse_find_expression
 from mirage.commands.errors import FindParseError
 from mirage.commands.safeguard import resolve_across_mounts
 from mirage.io import IOResult
@@ -74,8 +74,11 @@ def _adjust_depth_flags(
     delta = mount_depth - parent_depth
     new = dict(flag_kwargs)
     if "maxdepth" in new:
+        raw_md = new["maxdepth"]
+        if isinstance(raw_md, list):
+            raw_md = raw_md[0] if raw_md else None
         try:
-            md = int(new["maxdepth"]) - delta
+            md = int(raw_md) - delta
         except (TypeError, ValueError):
             md = None
         if md is not None:
@@ -83,55 +86,96 @@ def _adjust_depth_flags(
                 return None
             new["maxdepth"] = str(md)
     if "mindepth" in new:
+        raw_mn = new["mindepth"]
+        if isinstance(raw_mn, list):
+            raw_mn = raw_mn[0] if raw_mn else None
         try:
-            mn = max(0, int(new["mindepth"]) - delta)
+            mn = max(0, int(raw_mn) - delta)
             new["mindepth"] = str(mn)
         except (TypeError, ValueError):
             pass
     return new
 
 
+def _adjust_depth_texts(
+    texts: list[str],
+    parent_path: str,
+    mount_prefix: str,
+) -> list[str]:
+    """Adjust -maxdepth/-mindepth values inside a find expression.
+
+    The generic find parses depth from the expression tokens (`texts`),
+    not from flag kwargs, so a fan-out into a deeper child mount must
+    rewrite the depth values by the parent-to-mount delta. Mirrors
+    `_adjust_depth_flags`.
+
+    Args:
+        texts (list[str]): the find expression tokens.
+        parent_path (str): the find start path the fan-out runs from.
+        mount_prefix (str): the child mount prefix being descended into.
+    """
+    delta = len(_path_segments(mount_prefix)) - len(
+        _path_segments(parent_path))
+    if delta == 0:
+        return list(texts)
+    out = list(texts)
+    i = 0
+    while i < len(out) - 1:
+        tok = out[i]
+        if tok in ("-maxdepth", "-mindepth"):
+            try:
+                val = int(out[i + 1])
+            except ValueError:
+                i += 2
+                continue
+            if tok == "-maxdepth":
+                out[i + 1] = str(val - delta)
+            else:
+                out[i + 1] = str(max(0, val - delta))
+            i += 2
+            continue
+        i += 1
+    return out
+
+
 def _synthesize_find_mount_entries(
     target_path: str,
     descendants: list,
-    flag_kwargs: dict,
+    texts: list[str],
 ) -> str:
     """Return synthetic find lines for descendant mount roots.
 
     `find /` and friends should list mount prefixes as directory
-    entries even though no per-mount find emits its own root. Honors
-    -maxdepth / -mindepth windows and the -type filter (only injects
-    when 'd' or no type filter is set).
+    entries even though no per-mount find emits its own root. The find
+    expression is parsed into a predicate tree and evaluated per mount
+    root (kind "d"), mirroring the per-backend cores, so -not / -o /
+    -path / -type and the -maxdepth / -mindepth window all apply.
+
+    Args:
+        target_path (str): the find start path the fan-out runs from.
+        descendants (list): descendant mounts to inject as entries.
+        texts (list[str]): the find expression tokens.
     """
-    type_filter = flag_kwargs.get("type")
-    if type_filter is not None and type_filter != "d":
+    try:
+        expr = parse_find_expression(list(texts))
+    except FindParseError:
         return ""
+    tree = expr.tree
+    max_depth = expr.maxdepth
+    min_depth = expr.mindepth if expr.mindepth is not None else 0
     parent_depth = len(_path_segments(target_path))
-    try:
-        max_depth = (int(flag_kwargs["maxdepth"])
-                     if "maxdepth" in flag_kwargs else None)
-    except (TypeError, ValueError):
-        max_depth = None
-    try:
-        min_depth = (int(flag_kwargs["mindepth"])
-                     if "mindepth" in flag_kwargs else 0)
-    except (TypeError, ValueError):
-        min_depth = 0
-    name_pat = flag_kwargs.get("name")
-    iname_pat = flag_kwargs.get("iname")
     out: list[str] = []
     for m in descendants:
         prefix_no_slash = m.prefix.rstrip("/")
         depth = len(_path_segments(prefix_no_slash)) - parent_depth
-        if depth < min_depth:
-            continue
         if max_depth is not None and depth > max_depth:
             continue
         base = prefix_no_slash.rsplit("/", 1)[-1] or prefix_no_slash
-        if isinstance(name_pat, str) and not fnmatch.fnmatch(base, name_pat):
-            continue
-        if isinstance(iname_pat, str) and not fnmatch.fnmatch(
-                base.lower(), iname_pat.lower()):
+        entry = FindEntry(key=prefix_no_slash,
+                          name=base,
+                          kind="d",
+                          depth=depth)
+        if not keep(entry, tree, min_depth):
             continue
         out.append(prefix_no_slash)
     return "\n".join(out)
@@ -206,12 +250,14 @@ async def _fan_out_traversal(
         if mount is primary_mount:
             sub_paths = list(paths)
             sub_flags = dict(flag_kwargs)
+            sub_texts = list(texts)
         else:
             mount_root = mount.prefix.rstrip("/") or "/"
             sub_flags = _adjust_depth_flags(flag_kwargs, target_path,
                                             mount.prefix)
             if sub_flags is None:
                 continue
+            sub_texts = _adjust_depth_texts(texts, target_path, mount.prefix)
             sub_paths = [
                 PathSpec(original=mount_root,
                          directory=mount_root,
@@ -220,7 +266,7 @@ async def _fan_out_traversal(
         try:
             stdout, io = await mount.execute_cmd(cmd_name,
                                                  sub_paths,
-                                                 list(texts),
+                                                 sub_texts,
                                                  sub_flags,
                                                  stdin=stdin,
                                                  cwd=cwd)
@@ -247,7 +293,7 @@ async def _fan_out_traversal(
 
     if cmd_name == "find":
         synthetic = _synthesize_find_mount_entries(target_path, descendants,
-                                                   flag_kwargs)
+                                                   texts)
         if synthetic:
             all_stdout.append(synthetic.encode("utf-8"))
 

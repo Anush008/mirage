@@ -31,7 +31,7 @@ function defaultName(
 ): Record<string, string | boolean | string[]> {
   if (typeof flags.name === 'string') return flags
   const first = texts[0]
-  if (first !== undefined && !first.startsWith('-')) {
+  if (first !== undefined && !first.startsWith('-') && !['(', ')', '!'].includes(first)) {
     return { ...flags, name: first }
   }
   return flags

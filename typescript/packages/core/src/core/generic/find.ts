@@ -14,9 +14,9 @@
 
 import type { IndexCacheStore } from '../../cache/index/store.ts'
 import type { FindOptions } from '../../resource/base.ts'
-import { fnmatch } from '../../utils/fnmatch.ts'
+import { buildTree, type FindEntry, keep } from '../../commands/builtin/findEval.ts'
 import { FileType, PathSpec, type FileStat } from '../../types.ts'
-import { rstripSlash } from '../../utils/slash.ts'
+import { rstripSlash, stripSlash } from '../../utils/slash.ts'
 
 export interface WalkFindDeps {
   readdir: (spec: PathSpec, index?: IndexCacheStore) => Promise<string[]>
@@ -111,24 +111,41 @@ export async function walkFind(
   await walk(deps, path, index, options.maxDepth ?? null, 1, collected)
   const prefix = path.prefix
   const results: string[] = []
+  const tree =
+    options.tree ??
+    buildTree({
+      name: options.name,
+      iname: options.iname,
+      pathPattern: options.pathPattern,
+      type: options.type,
+      nameExclude: options.nameExclude,
+      orNames: options.orNames,
+    })
+  const searchKey = stripSlash(path.stripPrefix)
+  if (searchKey !== '' && (options.maxDepth == null || options.maxDepth >= 0)) {
+    let rootStat: FileStat | null = null
+    try {
+      rootStat = await deps.stat(path, index)
+    } catch (err) {
+      if (!isEnoent(err)) throw err
+    }
+    if (rootStat !== null) {
+      const rootPath = prefix !== '' ? `${prefix}/${searchKey}` : `/${searchKey}`
+      collected.push({ path: rootPath, depth: 0, file: rootStat.type !== FileType.DIRECTORY })
+    }
+  }
   collected.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
   for (const entry of collected) {
     const name = entry.path.split('/').pop() ?? ''
-    if (options.minDepth != null && entry.depth < options.minDepth) continue
-    if (options.type === 'f' && !entry.file) continue
-    if (options.type === 'd' && entry.file) continue
-    if (options.orNames != null && options.orNames.length > 0) {
-      if (!options.orNames.some((pat) => fnmatch(name, pat))) continue
-    } else if (options.name != null && !fnmatch(name, options.name)) {
-      continue
-    }
-    if (options.iname != null && !fnmatch(name.toLowerCase(), options.iname.toLowerCase())) {
-      continue
-    }
     const key =
       prefix !== '' && entry.path.startsWith(prefix) ? entry.path.slice(prefix.length) : entry.path
-    if (options.pathPattern != null && !fnmatch(key, options.pathPattern)) continue
-    if (options.nameExclude != null && fnmatch(name, options.nameExclude)) continue
+    const findEntry: FindEntry = {
+      key,
+      name,
+      kind: entry.file ? 'f' : 'd',
+      depth: entry.depth,
+    }
+    if (!keep(findEntry, tree, options.minDepth)) continue
     const needSize = entry.file && (options.minSize != null || options.maxSize != null)
     const needMtime = options.mtimeMin != null || options.mtimeMax != null
     if (needSize || needMtime) {

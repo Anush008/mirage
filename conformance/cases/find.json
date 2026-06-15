@@ -16,7 +16,7 @@
       },
       "expect": {
         "exit": 0,
-        "stdout_text": "/data/sub/deep\n/data/sub/deep/deeper.txt\n/data/sub/nested.txt\n",
+        "stdout_text": "/data/sub\n/data/sub/deep\n/data/sub/deep/deeper.txt\n/data/sub/nested.txt\n",
         "stderr_text": ""
       }
     },

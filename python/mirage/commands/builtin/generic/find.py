@@ -1,13 +1,13 @@
-import fnmatch
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from mirage.cache.index import IndexCacheStore
-from mirage.commands.builtin.find_helper import (_extract_not_name,
-                                                 _extract_or_names,
-                                                 _parse_depth, _parse_mtime,
+from mirage.commands.builtin.find_eval import (FindEntry, PredNode,
+                                               args_to_tree, keep)
+from mirage.commands.builtin.find_helper import (_parse_depth, _parse_mtime,
                                                  _parse_size)
+from mirage.commands.builtin.find_parse import parse_find_expression
 from mirage.commands.builtin.utils.output import format_records
 from mirage.io.types import ByteSource, IOResult
 from mirage.types import FileStat, FileType, FindType, PathSpec
@@ -27,6 +27,8 @@ class FindArgs:
     mindepth: int | None = None
     name_exclude: str | None = None
     or_names: list[str] | None = None
+    empty: bool = False
+    tree: PredNode | None = None
 
 
 def parse_find_args(
@@ -40,7 +42,20 @@ def parse_find_args(
     iname: str | None = None,
     path: str | None = None,
     mindepth: str | None = None,
+    empty: bool = False,
 ) -> FindArgs:
+    if texts:
+        expr = parse_find_expression(list(texts))
+        return FindArgs(
+            min_size=expr.min_size,
+            max_size=expr.max_size,
+            mtime_min=expr.mtime_min,
+            mtime_max=expr.mtime_max,
+            maxdepth=expr.maxdepth,
+            mindepth=expr.mindepth,
+            empty=expr.uses_empty,
+            tree=expr.tree,
+        )
     ftype: FindType | str | None = type
     if type in (FindType.DIRECTORY.value, FindType.FILE.value):
         ftype = FindType(type)
@@ -53,9 +68,6 @@ def parse_find_args(
     mtime_min, mtime_max = (None, None)
     if mtime is not None:
         mtime_min, mtime_max = _parse_mtime(mtime)
-    name_exclude = _extract_not_name(texts)
-    or_names_all = _extract_or_names(name, texts)
-    or_names = or_names_all if len(or_names_all) > 1 else None
     return FindArgs(
         name=name,
         iname=iname,
@@ -67,8 +79,7 @@ def parse_find_args(
         mtime_max=mtime_max,
         maxdepth=md,
         mindepth=md_min,
-        name_exclude=name_exclude,
-        or_names=or_names,
+        empty=empty,
     )
 
 
@@ -124,6 +135,7 @@ async def find(
     iname: str | None = None,
     path: str | None = None,
     mindepth: str | None = None,
+    empty: bool = False,
 ) -> tuple[ByteSource | None, IOResult]:
     search_path = paths[0]
     args = parse_find_args(texts,
@@ -134,7 +146,8 @@ async def find(
                            maxdepth=maxdepth,
                            iname=iname,
                            path=path,
-                           mindepth=mindepth)
+                           mindepth=mindepth,
+                           empty=empty)
     if stat is not None:
         try:
             await stat(search_path)
@@ -153,6 +166,8 @@ async def find(
         or_names=args.or_names,
         iname=args.iname,
         path_pattern=args.path_pattern,
+        empty=args.empty,
+        tree=args.tree,
     )
     if stat is not None:
         results = await apply_mtime_filter(results,
@@ -251,30 +266,25 @@ async def walk_find(
     prefix = search_path.prefix
     search_key = search_path.strip_prefix.strip("/")
     base_depth = search_key.count("/") if search_key else -1
+    if search_key and (args.maxdepth is None or args.maxdepth >= 0):
+        try:
+            root_stat = await stat(search_path, index)
+        except FileNotFoundError:
+            root_stat = None
+        if root_stat is not None:
+            root_p = prefix + "/" + search_key if prefix else "/" + search_key
+            collected.append((root_p, root_stat.type == FileType.DIRECTORY))
+    tree = args_to_tree(args)
     results: list[str] = []
     for p, is_dir in sorted(collected):
         entry_name = p.rsplit("/", 1)[-1]
         key = p[len(prefix):] if prefix and p.startswith(prefix) else p
         depth = key.strip("/").count("/") - base_depth
-        if args.mindepth is not None and depth < args.mindepth:
-            continue
-        if args.type == FindType.FILE and is_dir:
-            continue
-        if args.type == FindType.DIRECTORY and not is_dir:
-            continue
-        if args.or_names:
-            if not any(
-                    fnmatch.fnmatch(entry_name, pat) for pat in args.or_names):
-                continue
-        elif args.name and not fnmatch.fnmatch(entry_name, args.name):
-            continue
-        if args.iname and not fnmatch.fnmatch(entry_name.lower(),
-                                              args.iname.lower()):
-            continue
-        if args.path_pattern and not fnmatch.fnmatch(key, args.path_pattern):
-            continue
-        if args.name_exclude and fnmatch.fnmatch(entry_name,
-                                                 args.name_exclude):
+        entry = FindEntry(key=key,
+                          name=entry_name,
+                          kind="d" if is_dir else "f",
+                          depth=depth)
+        if not keep(entry, tree, args.mindepth):
             continue
         need_size = not is_dir and (args.min_size is not None
                                     or args.max_size is not None)

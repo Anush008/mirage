@@ -12,9 +12,9 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from fnmatch import fnmatch
-
 from mirage.accessor.ram import RAMAccessor
+from mirage.commands.builtin.find_eval import (FindEntry, PredNode, build_tree,
+                                               compute_nonempty_dirs, keep)
 from mirage.types import PathSpec
 from mirage.utils.path import norm
 
@@ -32,6 +32,8 @@ async def find(
     iname: str | None = None,
     path_pattern: str | None = None,
     mindepth: int | None = None,
+    empty: bool = False,
+    tree: PredNode | None = None,
 ) -> list[str]:
     if isinstance(path, str):
         path = PathSpec(original=path, directory=path)
@@ -42,6 +44,17 @@ async def find(
     prefix = p.rstrip("/") + "/"
     base_depth = 0 if p == "/" else p.count("/")
     results: list[str] = []
+    if tree is None:
+        tree = build_tree(name=name,
+                          iname=iname,
+                          path_pattern=path_pattern,
+                          type=type,
+                          name_exclude=name_exclude,
+                          or_names=or_names,
+                          empty=empty)
+    nonempty = compute_nonempty_dirs([
+        *store.files, *(k for k in store.dirs if k != "/")
+    ]) if empty else set()
 
     candidates: list[tuple[str, str]] = []
     if type != "d":
@@ -55,32 +68,23 @@ async def find(
     for key, kind in candidates:
         if key != p and not key.startswith(prefix):
             continue
-        if key == p and kind == "d":
-            continue
 
         depth = key.count("/") - base_depth
 
         if maxdepth is not None and depth > maxdepth:
             continue
 
-        if mindepth is not None and depth < mindepth:
-            continue
-
         basename = key.rsplit("/", 1)[-1]
-        if name is not None and not fnmatch(basename, name):
-            continue
-
-        if iname is not None and not fnmatch(basename.lower(), iname.lower()):
-            continue
-
-        if path_pattern is not None and not fnmatch(key, path_pattern):
-            continue
-
-        if or_names is not None and not any(
-                fnmatch(basename, pat) for pat in or_names):
-            continue
-
-        if name_exclude is not None and fnmatch(basename, name_exclude):
+        is_empty: bool | None = None
+        if empty:
+            is_empty = (len(store.files[key])
+                        == 0) if kind == "f" else key not in nonempty
+        entry = FindEntry(key=key,
+                          name=basename,
+                          kind=kind,
+                          depth=depth,
+                          is_empty=is_empty)
+        if not keep(entry, tree, mindepth):
             continue
 
         if kind == "f" and (min_size is not None or max_size is not None):

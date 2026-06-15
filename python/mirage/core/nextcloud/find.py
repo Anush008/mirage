@@ -1,9 +1,9 @@
-from fnmatch import fnmatch
-
 from opendal.exceptions import NotFound
 from opendal.types import EntryMode
 
 from mirage.accessor.nextcloud import NextcloudAccessor
+from mirage.commands.builtin.find_eval import (FindEntry, PredNode, build_tree,
+                                               keep)
 from mirage.types import PathSpec
 
 
@@ -22,6 +22,8 @@ async def find(
     iname: str | None = None,
     path_pattern: str | None = None,
     mindepth: int | None = None,
+    empty: bool = False,
+    tree: PredNode | None = None,
 ) -> list[str]:
     if isinstance(path, str):
         path = PathSpec.from_str_path(path)
@@ -34,17 +36,30 @@ async def find(
     op = accessor.operator()
     results: list[str] = []
     seen_dirs: set[str] = set()
+    saw_descendant = False
+    dir_exists = False
+    tree = tree if tree is not None else build_tree(name=name,
+                                                    iname=iname,
+                                                    path_pattern=path_pattern,
+                                                    type=type,
+                                                    name_exclude=name_exclude,
+                                                    or_names=or_names)
     try:
         async for entry in await op.scan(scan_path):
             rel = entry.path
             if not rel:
                 continue
-            is_dir = (rel.endswith("/") or getattr(entry.metadata, "mode",
-                                                   None) == EntryMode.Dir)
+            meta = entry.metadata
+            is_dir = (rel.endswith("/")
+                      or getattr(meta, "mode", None) == EntryMode.Dir)
             entry_path = "/" + rel.rstrip("/").lstrip("/")
             if entry_path == base:
+                dir_exists = True
                 continue
+            saw_descendant = True
             kind = "d" if is_dir else "f"
+            content_length = getattr(meta, "content_length", 0) or 0
+            last_modified = getattr(meta, "last_modified", None)
 
             file_entries: list[tuple[str, str]] = [(entry_path, kind)]
             if not is_dir:
@@ -57,48 +72,28 @@ async def find(
 
             for ep, k in file_entries:
                 en = ep.rsplit("/", 1)[-1]
-
-                if type == "f" or type == "file":
-                    if k != "f":
-                        continue
-                elif type == "d" or type == "directory":
-                    if k != "d":
-                        continue
-
-                if or_names:
-                    if not any(fnmatch(en, pat) for pat in or_names):
-                        continue
-                elif name is not None and not fnmatch(en, name):
-                    continue
-
-                if iname is not None and not fnmatch(en.lower(),
-                                                     iname.lower()):
-                    continue
-
-                if path_pattern is not None and not fnmatch(ep, path_pattern):
-                    continue
-
-                if name_exclude is not None and fnmatch(en, name_exclude):
-                    continue
-
                 depth = ep.count("/") - base_depth
                 if maxdepth is not None and depth > maxdepth:
                     continue
-                if mindepth is not None and depth < mindepth:
+                fe = FindEntry(
+                    key=ep,
+                    name=en,
+                    kind=k,
+                    depth=depth,
+                    is_empty=False if k == "d" else content_length == 0)
+                if not keep(fe, tree, mindepth):
                     continue
 
                 if k == "f" and (min_size is not None or max_size is not None):
-                    size = getattr(entry.metadata, "content_length", 0) or 0
-                    if min_size is not None and size < min_size:
+                    if min_size is not None and content_length < min_size:
                         continue
-                    if max_size is not None and size > max_size:
+                    if max_size is not None and content_length > max_size:
                         continue
 
                 if mtime_min is not None or mtime_max is not None:
-                    lm = getattr(entry.metadata, "last_modified", None)
-                    if lm is None:
+                    if last_modified is None:
                         continue
-                    mt = lm.timestamp()
+                    mt = last_modified.timestamp()
                     if mtime_min is not None and mt < mtime_min:
                         continue
                     if mtime_max is not None and mt > mtime_max:
@@ -107,4 +102,13 @@ async def find(
                 results.append(ep)
     except NotFound:
         return []
+    if base != "/" and (saw_descendant or dir_exists) and (maxdepth is None
+                                                           or maxdepth >= 0):
+        root_entry = FindEntry(key=base,
+                               name=base.rsplit("/", 1)[-1],
+                               kind="d",
+                               depth=0,
+                               is_empty=False)
+        if keep(root_entry, tree, mindepth):
+            results.append(base)
     return sorted(set(results))

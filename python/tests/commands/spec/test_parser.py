@@ -196,7 +196,7 @@ def test_known_flags_produce_no_warnings():
 
 def test_find_multichar_short_flag_still_works():
     parsed = parse_command(SPECS["find"], ["/data", "-name", "*.txt"], "/")
-    assert parsed.flags["-name"] == "*.txt"
+    assert parsed.flags["-name"] == ["*.txt"]
 
 
 def test_cluster_into_repeatable_flag_accumulates():

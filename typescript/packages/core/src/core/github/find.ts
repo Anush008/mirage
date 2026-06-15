@@ -15,7 +15,7 @@
 import type { GitHubAccessor } from '../../accessor/github.ts'
 import type { FindOptions } from '../../resource/base.ts'
 import type { PathSpec } from '../../types.ts'
-import { fnmatch } from '../../utils/fnmatch.ts'
+import { buildTree, keep } from '../../commands/builtin/findEval.ts'
 import { stripSlash } from '../../utils/slash.ts'
 
 function strip(path: PathSpec): string {
@@ -34,36 +34,36 @@ export function find(
   const prefix = base === '' ? '' : `${base}/`
   const baseDepth = base === '' ? 0 : (base.match(/\//g) ?? []).length + 1
   const results: string[] = []
+  const tree =
+    options.tree ??
+    buildTree({
+      name: options.name,
+      iname: options.iname,
+      pathPattern: options.pathPattern,
+      type: options.type,
+      nameExclude: options.nameExclude,
+      orNames: options.orNames,
+    })
   const sortedKeys = Object.keys(accessor.tree).sort()
   for (const p of sortedKeys) {
     if (p !== base && !p.startsWith(prefix)) continue
     const entry = accessor.tree[p]
     if (entry === undefined) continue
     const isDir = entry.type === 'tree'
-    if (options.type === 'f' && isDir) continue
-    if (options.type === 'd' && !isDir) continue
     const fullPath = `/${p}`
     const depth = (p.match(/\//g) ?? []).length + 1 - baseDepth
     if (options.maxDepth !== null && options.maxDepth !== undefined && depth > options.maxDepth) {
       continue
     }
-    if (options.minDepth !== null && options.minDepth !== undefined && depth < options.minDepth) {
-      continue
-    }
     const entryName = p.split('/').pop() ?? p
-    if (options.orNames !== null && options.orNames !== undefined && options.orNames.length > 0) {
-      if (!options.orNames.some((pat) => fnmatch(entryName, pat))) continue
-    } else if (options.name !== null && options.name !== undefined) {
-      if (!fnmatch(entryName, options.name)) continue
-    }
-    if (options.iname !== null && options.iname !== undefined) {
-      if (!fnmatch(entryName.toLowerCase(), options.iname.toLowerCase())) continue
-    }
-    if (options.pathPattern !== null && options.pathPattern !== undefined) {
-      if (!fnmatch(fullPath, options.pathPattern)) continue
-    }
-    if (options.nameExclude !== null && options.nameExclude !== undefined) {
-      if (fnmatch(entryName, options.nameExclude)) continue
+    if (
+      !keep(
+        { key: fullPath, name: entryName, kind: isDir ? 'd' : 'f', depth },
+        tree,
+        options.minDepth,
+      )
+    ) {
+      continue
     }
     const size = entry.size ?? 0
     if (options.minSize !== null && options.minSize !== undefined && size < options.minSize) {

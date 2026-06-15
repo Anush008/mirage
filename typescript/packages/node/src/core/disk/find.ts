@@ -17,7 +17,7 @@ import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 import type { PathSpec } from '@struktoai/mirage-core'
 import { norm, resolveSafe } from './utils.ts'
-import { fnmatch } from '@struktoai/mirage-core'
+import { buildTree, type PredNode, keep } from '@struktoai/mirage-core'
 
 export interface FindOptions {
   name?: string | null
@@ -30,6 +30,8 @@ export interface FindOptions {
   orNames?: string[] | null
   iname?: string | null
   pathPattern?: string | null
+  empty?: boolean | null
+  tree?: PredNode | null
   mtimeMin?: number | null
   mtimeMax?: number | null
 }
@@ -39,6 +41,7 @@ interface WalkCtx {
   base: string
   baseDepth: number
   options: FindOptions
+  tree: PredNode
   results: string[]
 }
 
@@ -53,60 +56,33 @@ async function walk(ctx: WalkCtx, full: string, current: string, depth: number):
   }
   for (const e of entries) {
     const kind: 'f' | 'd' = e.isDirectory() ? 'd' : 'f'
-    if (opts.type === 'f' && kind !== 'f') {
-      const childPath = current === '/' ? `/${e.name}` : `${current}/${e.name}`
-      await walk(ctx, path.join(full, e.name), childPath, depth + 1)
-      continue
-    }
-    if (opts.type === 'd' && kind !== 'd') continue
     const entryPath = current === '/' ? `/${e.name}` : `${current}/${e.name}`
     const entryName = e.name
     const entrySlashCount = (entryPath.match(/\//g) ?? []).length
     const entryDepth = entrySlashCount - ctx.baseDepth
 
     let accept = true
-    if (opts.orNames !== null && opts.orNames !== undefined && opts.orNames.length > 0) {
-      if (!opts.orNames.some((pat) => fnmatch(entryName, pat))) accept = false
-    } else if (opts.name !== null && opts.name !== undefined) {
-      if (!fnmatch(entryName, opts.name)) accept = false
-    }
-    if (
-      accept &&
-      opts.iname !== null &&
-      opts.iname !== undefined &&
-      !fnmatch(entryName.toLowerCase(), opts.iname.toLowerCase())
-    ) {
+    if (opts.maxDepth !== null && opts.maxDepth !== undefined && entryDepth > opts.maxDepth) {
       accept = false
     }
-    if (
-      accept &&
-      opts.pathPattern !== null &&
-      opts.pathPattern !== undefined &&
-      !fnmatch(entryPath, opts.pathPattern)
-    ) {
-      accept = false
+    let isEmpty: boolean | null = null
+    if (accept && opts.empty === true) {
+      try {
+        isEmpty =
+          kind === 'f'
+            ? (await stat(path.join(full, e.name))).size === 0
+            : (await readdir(path.join(full, e.name))).length === 0
+      } catch {
+        isEmpty = null
+      }
     }
     if (
       accept &&
-      opts.nameExclude !== null &&
-      opts.nameExclude !== undefined &&
-      fnmatch(entryName, opts.nameExclude)
-    ) {
-      accept = false
-    }
-    if (
-      accept &&
-      opts.maxDepth !== null &&
-      opts.maxDepth !== undefined &&
-      entryDepth > opts.maxDepth
-    ) {
-      accept = false
-    }
-    if (
-      accept &&
-      opts.minDepth !== null &&
-      opts.minDepth !== undefined &&
-      entryDepth < opts.minDepth
+      !keep(
+        { key: entryPath, name: entryName, kind, depth: entryDepth, isEmpty },
+        ctx.tree,
+        opts.minDepth,
+      )
     ) {
       accept = false
     }
@@ -154,7 +130,50 @@ export async function find(
   const full = resolveSafe(accessor.root, virtual)
   const baseDepth = virtual === '/' ? 0 : (virtual.match(/\//g) ?? []).length
   const results: string[] = []
-  await walk({ accessor, base: virtual, baseDepth, options, results }, full, virtual, 0)
+  const tree =
+    options.tree ??
+    buildTree({
+      name: options.name,
+      iname: options.iname,
+      pathPattern: options.pathPattern,
+      type: options.type,
+      nameExclude: options.nameExclude,
+      orNames: options.orNames,
+      empty: options.empty,
+    })
+  if (virtual !== '/' && (options.maxDepth == null || options.maxDepth >= 0)) {
+    let isDir = false
+    try {
+      isDir = (await stat(full)).isDirectory()
+    } catch {
+      isDir = false
+    }
+    let rootEmpty: boolean | null = null
+    if (isDir && options.empty === true) {
+      try {
+        rootEmpty = (await readdir(full)).length === 0
+      } catch {
+        rootEmpty = null
+      }
+    }
+    if (
+      isDir &&
+      keep(
+        {
+          key: virtual,
+          name: virtual.slice(virtual.lastIndexOf('/') + 1),
+          kind: 'd',
+          depth: 0,
+          isEmpty: rootEmpty,
+        },
+        tree,
+        options.minDepth,
+      )
+    ) {
+      results.push(virtual)
+    }
+  }
+  await walk({ accessor, base: virtual, baseDepth, options, tree, results }, full, virtual, 0)
   results.sort()
   return results
 }

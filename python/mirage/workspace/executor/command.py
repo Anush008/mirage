@@ -15,6 +15,8 @@
 from collections.abc import Callable
 from typing import NamedTuple
 
+from mirage.commands.builtin.find_parse import (FindParseError, find_expr_tail,
+                                                parse_find_expression)
 from mirage.commands.builtin.utils.safeguard import maybe_with_timeout
 from mirage.commands.safeguard import resolve_across_mounts, resolve_safeguard
 from mirage.commands.spec import (SPECS, OperandKind, flag_kwarg_name,
@@ -292,6 +294,19 @@ async def handle_command(
                                   exit_code=code,
                                   stderr=msg.encode())
 
+    find_expr_tokens: list[str] | None = None
+    if cmd_name == "find":
+        find_expr_tokens = find_expr_tail(raw_argv)
+        try:
+            parse_find_expression(find_expr_tokens)
+        except FindParseError as exc:
+            msg = f"{exc}\n"
+            return None, IOResult(exit_code=1,
+                                  stderr=msg.encode()), ExecutionNode(
+                                      command=cmd_str,
+                                      exit_code=1,
+                                      stderr=msg.encode())
+
     if is_cross_mount(cmd_name, path_scopes, registry):
         flag_kwargs = {}
         # Cross-mount execution bypasses a resource command handler. Parse
@@ -353,6 +368,16 @@ async def handle_command(
     # Parse flags upstream — mount receives clean args
     paths, texts, flag_kwargs, parse_warnings = _parse_flags(
         parts[1:], mount, cmd_name, session.cwd)
+
+    if find_expr_tokens is not None:
+        texts = find_expr_tokens
+        # `repeatable=True` on find value-flags makes parse_to_kwargs emit
+        # lists; bespoke backend wrappers read these as scalars. Migrated
+        # backends read the expression from `texts` and ignore flag_kwargs.
+        flag_kwargs = {
+            k: (v[-1] if isinstance(v, list) and v else v)
+            for k, v in flag_kwargs.items()
+        }
 
     warn_bytes = ("".join(
         f"{cmd_name}: {w}\n"

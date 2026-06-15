@@ -506,6 +506,30 @@ baz
 /data/user.json
 /data/users.json
 === find_multi_name ===
+/data/a.txt
+/data/b.txt
+/data/c.txt
+/data/dup.txt
+/data/empty.txt
+/data/fields.txt
+/data/guard/g.txt
+/data/guard/sub/s.txt
+/data/mixed.txt
+/data/no_nl.txt
+/data/numbers.txt
+/data/one_byte.txt
+/data/patterns.txt
+/data/patterns2.txt
+/data/prefix_dup.txt
+/data/repeats.txt
+/data/sections.txt
+/data/sorted_a.txt
+/data/sorted_b.txt
+/data/sorted_c.txt
+/data/spaced.txt
+/data/sub/deep/deeper.txt
+/data/sub/nested.txt
+/data/tabbed.txt
 /data/user.json
 /data/users.json
 === wc_multi ===
@@ -999,66 +1023,19 @@ baz,
 === file_binary ===
 /data/binary.bin: binary
 === find_empty ===
-/data/a.txt
+/data/empty.txt
+=== find_not_name ===
 /data/abc.csv
-/data/b.txt
 /data/binary.bin
-/data/c.txt
 /data/chat.jsonl
 /data/csv.csv
 /data/data.jsonl
-/data/dup.txt
-/data/empty.txt
-/data/fields.txt
 /data/guard
-/data/guard/g.txt
 /data/guard/sub
-/data/guard/sub/s.txt
-/data/mixed.txt
-/data/no_nl.txt
-/data/numbers.txt
-/data/one_byte.txt
-/data/patterns.txt
-/data/patterns2.txt
-/data/prefix_dup.txt
-/data/repeats.txt
-/data/sections.txt
-/data/sorted_a.txt
-/data/sorted_b.txt
-/data/sorted_c.txt
-/data/spaced.txt
 /data/sub
 /data/sub/deep
-/data/sub/deep/deeper.txt
-/data/sub/nested.txt
-/data/tabbed.txt
 /data/user.json
 /data/users.json
-=== find_not_name ===
-/data/a.txt
-/data/b.txt
-/data/c.txt
-/data/dup.txt
-/data/empty.txt
-/data/fields.txt
-/data/guard/g.txt
-/data/guard/sub/s.txt
-/data/mixed.txt
-/data/no_nl.txt
-/data/numbers.txt
-/data/one_byte.txt
-/data/patterns.txt
-/data/patterns2.txt
-/data/prefix_dup.txt
-/data/repeats.txt
-/data/sections.txt
-/data/sorted_a.txt
-/data/sorted_b.txt
-/data/sorted_c.txt
-/data/spaced.txt
-/data/sub/deep/deeper.txt
-/data/sub/nested.txt
-/data/tabbed.txt
 === find_size_lt ===
 /data/empty.txt
 /data/guard
@@ -1415,6 +1392,16 @@ gz-data
 a  b
 === echo_empty_dquote ===
 a  b
+=== root_create ===
+atroot
+=== root_create_cat ===
+atroot
+=== root_create_mkdir ===
+/data/rootdir
+=== root_create_basename ===
+at_root.txt
+=== root_create_dirname ===
+/data
 === jq_no_filter_no_input ===
 exit=0
 === jq_dot_no_input ===

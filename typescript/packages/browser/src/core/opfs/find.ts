@@ -15,7 +15,7 @@
 import type { PathSpec } from '@struktoai/mirage-core'
 import type { OPFSAccessor } from '../../accessor/opfs.ts'
 import { isNotFound, iterEntries, norm, resolveDirHandle } from './utils.ts'
-import { fnmatch } from '@struktoai/mirage-core'
+import { buildTree, keep, type PredNode } from '@struktoai/mirage-core'
 
 export interface FindOptions {
   name?: string | null
@@ -28,12 +28,15 @@ export interface FindOptions {
   orNames?: string[] | null
   iname?: string | null
   pathPattern?: string | null
+  empty?: boolean | null
+  tree?: PredNode | null
   mtimeMin?: number | null
   mtimeMax?: number | null
 }
 
 interface WalkCtx {
   options: FindOptions
+  tree: PredNode
   results: string[]
 }
 
@@ -54,63 +57,36 @@ async function walk(
   for await (const [entryName, handle] of iter) {
     const kind: 'f' | 'd' = handle.kind === 'directory' ? 'd' : 'f'
     const entryPath = current === '/' ? `/${entryName}` : `${current}/${entryName}`
-    if (opts.type === 'f' && kind !== 'f') {
-      if (handle.kind === 'directory') {
-        try {
-          const child = await dir.getDirectoryHandle(entryName, { create: false })
-          await walk(ctx, child, entryPath, depth + 1)
-        } catch {
-          // ignore
-        }
-      }
-      continue
-    }
-    if (opts.type === 'd' && kind !== 'd') continue
     const entryDepth = depth + 1
 
     let accept = true
-    if (opts.orNames !== null && opts.orNames !== undefined && opts.orNames.length > 0) {
-      if (!opts.orNames.some((pat) => fnmatch(entryName, pat))) accept = false
-    } else if (opts.name !== null && opts.name !== undefined) {
-      if (!fnmatch(entryName, opts.name)) accept = false
-    }
-    if (
-      accept &&
-      opts.iname !== null &&
-      opts.iname !== undefined &&
-      !fnmatch(entryName.toLowerCase(), opts.iname.toLowerCase())
-    ) {
+    if (opts.maxDepth !== null && opts.maxDepth !== undefined && entryDepth > opts.maxDepth) {
       accept = false
     }
-    if (
-      accept &&
-      opts.pathPattern !== null &&
-      opts.pathPattern !== undefined &&
-      !fnmatch(entryPath, opts.pathPattern)
-    ) {
-      accept = false
+    let isEmpty: boolean | null = null
+    if (accept && opts.empty === true) {
+      try {
+        if (kind === 'f') {
+          isEmpty = (await (handle as FileSystemFileHandle).getFile()).size === 0
+        } else {
+          isEmpty = true
+          for await (const _child of iterEntries(handle as FileSystemDirectoryHandle)) {
+            void _child
+            isEmpty = false
+            break
+          }
+        }
+      } catch {
+        isEmpty = null
+      }
     }
     if (
       accept &&
-      opts.nameExclude !== null &&
-      opts.nameExclude !== undefined &&
-      fnmatch(entryName, opts.nameExclude)
-    ) {
-      accept = false
-    }
-    if (
-      accept &&
-      opts.maxDepth !== null &&
-      opts.maxDepth !== undefined &&
-      entryDepth > opts.maxDepth
-    ) {
-      accept = false
-    }
-    if (
-      accept &&
-      opts.minDepth !== null &&
-      opts.minDepth !== undefined &&
-      entryDepth < opts.minDepth
+      !keep(
+        { key: entryPath, name: entryName, kind, depth: entryDepth, isEmpty },
+        ctx.tree,
+        opts.minDepth,
+      )
     ) {
       accept = false
     }
@@ -163,6 +139,17 @@ export async function find(
   const root = accessor.rootHandle
   const virtual = norm(p.stripPrefix)
   const results: string[] = []
+  const tree =
+    options.tree ??
+    buildTree({
+      name: options.name,
+      iname: options.iname,
+      pathPattern: options.pathPattern,
+      type: options.type,
+      nameExclude: options.nameExclude,
+      orNames: options.orNames,
+      empty: options.empty,
+    })
   let dir: FileSystemDirectoryHandle
   try {
     dir = await resolveDirHandle(root, virtual, { create: false })
@@ -170,7 +157,33 @@ export async function find(
     if (isNotFound(err)) return results
     throw err
   }
-  await walk({ options, results }, dir, virtual, 0)
+  if (virtual !== '/' && (options.maxDepth == null || options.maxDepth >= 0)) {
+    let rootEmpty: boolean | null = null
+    if (options.empty === true) {
+      rootEmpty = true
+      for await (const _child of iterEntries(dir)) {
+        void _child
+        rootEmpty = false
+        break
+      }
+    }
+    if (
+      keep(
+        {
+          key: virtual,
+          name: virtual.slice(virtual.lastIndexOf('/') + 1),
+          kind: 'd',
+          depth: 0,
+          isEmpty: rootEmpty,
+        },
+        tree,
+        options.minDepth,
+      )
+    ) {
+      results.push(virtual)
+    }
+  }
+  await walk({ options, tree, results }, dir, virtual, 0)
   results.sort()
   return results
 }
