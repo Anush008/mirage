@@ -30,6 +30,7 @@ import { resolveGlob } from '../../../core/email/glob.ts'
 import { readdir as emailReaddir } from '../../../core/email/readdir.ts'
 import { metadataProvision } from './provision.ts'
 import { fnmatch } from '@struktoai/mirage-core'
+import { findSizeMtimeError, invalidFindArg } from '@struktoai/mirage-core'
 
 async function walk(
   accessor: EmailAccessor,
@@ -85,6 +86,14 @@ async function findCommand(
   const minDepthRaw = typeof opts.flags.mindepth === 'string' ? opts.flags.mindepth : null
   const maxDepth = maxDepthRaw !== null ? Number.parseInt(maxDepthRaw, 10) : null
   const minDepth = minDepthRaw !== null ? Number.parseInt(minDepthRaw, 10) : null
+  if (maxDepthRaw !== null && Number.isNaN(maxDepth))
+    return invalidFindArg(maxDepthRaw, '-maxdepth')
+  if (minDepthRaw !== null && Number.isNaN(minDepth))
+    return invalidFindArg(minDepthRaw, '-mindepth')
+  const sizeFlag = typeof opts.flags.size === 'string' ? opts.flags.size : null
+  const mtimeFlag = typeof opts.flags.mtime === 'string' ? opts.flags.mtime : null
+  const sizeMtimeErr = findSizeMtimeError(sizeFlag, mtimeFlag)
+  if (sizeMtimeErr !== null) return sizeMtimeErr
 
   const allPaths = await walk(accessor, p0, opts.index, maxDepth, 0)
   const searchKey = stripSlash(p0.stripPrefix)

@@ -19,6 +19,7 @@ import pytest
 from mirage.accessor.github_ci import GitHubCIAccessor
 from mirage.cache.index.ram import RAMIndexCacheStore
 from mirage.commands.builtin.github_ci.find import find
+from mirage.commands.errors import FindParseError
 from mirage.io.stream import materialize
 from mirage.resource.github_ci.config import GitHubCIConfig
 from mirage.types import PathSpec
@@ -49,6 +50,15 @@ async def test_find_runs_root_rejected(accessor, index):
 async def test_find_root_rejected(accessor, index):
     with pytest.raises(ValueError, match="across runs is disabled"):
         await find(accessor, [], name="*.log", index=index)
+
+
+@pytest.mark.asyncio
+async def test_find_invalid_maxdepth_raises_find_parse_error(accessor, index):
+    with pytest.raises(FindParseError,
+                       match=r"invalid argument 'abc' to '-maxdepth'"):
+        await find(accessor, [_scope("/runs/wf_1")],
+                   maxdepth="abc",
+                   index=index)
 
 
 @pytest.mark.asyncio

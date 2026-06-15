@@ -21,6 +21,16 @@ import { rstripSlash } from '../../../utils/slash.ts'
 
 const ENC = new TextEncoder()
 
+export function invalidFindArg(value: string, flag: string): CommandFnResult {
+  return [
+    null,
+    new IOResult({
+      exitCode: 1,
+      stderr: ENC.encode(`find: invalid argument '${value}' to '${flag}'\n`),
+    }),
+  ]
+}
+
 function parseSize(spec: string): [number | null, number | null] {
   const suffixes: Record<string, number> = { c: 1, k: 1024, M: 1024 ** 2, G: 1024 ** 3 }
   const sign = spec.startsWith('+') ? '+' : spec.startsWith('-') ? '-' : ''
@@ -41,6 +51,26 @@ function parseMtime(spec: string): [number | null, number | null] {
   if (spec.startsWith('+')) return [null, now - n * day]
   if (spec.startsWith('-')) return [now - n * day, null]
   return [now - (n + 1) * day, now - n * day]
+}
+
+const nan = (v: number | null): boolean => v !== null && Number.isNaN(v)
+
+// Reject malformed -size/-mtime on backends that do not implement those
+// predicates, so a typo errors instead of being silently ignored. Returns the
+// exit-1 result on bad input, else null.
+export function findSizeMtimeError(
+  sizeFlag: string | null,
+  mtimeFlag: string | null,
+): CommandFnResult | null {
+  if (sizeFlag !== null) {
+    const [lo, hi] = parseSize(sizeFlag)
+    if (nan(lo) || nan(hi)) return invalidFindArg(sizeFlag, '-size')
+  }
+  if (mtimeFlag !== null) {
+    const [lo, hi] = parseMtime(mtimeFlag)
+    if (nan(lo) || nan(hi)) return invalidFindArg(mtimeFlag, '-mtime')
+  }
+  return null
 }
 
 function extractNotName(texts: readonly string[]): string | null {
@@ -91,6 +121,14 @@ export async function findGeneric(
   const minDepth = minDepthFlag !== null ? Number.parseInt(minDepthFlag, 10) : null
   const [minSize, maxSize] = sizeFlag !== null ? parseSize(sizeFlag) : [null, null]
   const [mtimeMin, mtimeMax] = mtimeFlag !== null ? parseMtime(mtimeFlag) : [null, null]
+  const isNan = (v: number | null): boolean => v !== null && Number.isNaN(v)
+  let badArg: readonly [string, string] | null = null
+  if (maxDepthFlag !== null && isNan(maxDepth)) badArg = [maxDepthFlag, '-maxdepth']
+  else if (minDepthFlag !== null && isNan(minDepth)) badArg = [minDepthFlag, '-mindepth']
+  else if (sizeFlag !== null && (isNan(minSize) || isNan(maxSize))) badArg = [sizeFlag, '-size']
+  else if (mtimeFlag !== null && (isNan(mtimeMin) || isNan(mtimeMax)))
+    badArg = [mtimeFlag, '-mtime']
+  if (badArg !== null) return invalidFindArg(badArg[0], badArg[1])
   const nameExclude = extractNotName(texts)
   const orNames = extractOrNames(nameFlag, texts)
   const matches: string[] = []

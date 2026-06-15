@@ -16,7 +16,8 @@ from mirage.accessor.onedrive import OneDriveAccessor
 from mirage.cache.index import IndexCacheStore
 from mirage.commands.builtin.find_helper import (_extract_not_name,
                                                  _extract_or_names,
-                                                 _parse_mtime, _parse_size)
+                                                 _parse_depth, _parse_mtime,
+                                                 _parse_size)
 from mirage.commands.builtin.onedrive._provision import metadata_provision
 from mirage.commands.registry import command
 from mirage.commands.spec import SPECS
@@ -58,7 +59,7 @@ async def find(
         ftype = "file"
     elif type is not None:
         ftype = type
-    md = int(maxdepth) if maxdepth is not None else None
+    md = _parse_depth(maxdepth, "-maxdepth") if maxdepth is not None else None
     min_size, max_size = (None, None)
     if size is not None:
         min_size, max_size = _parse_size(size)
@@ -67,7 +68,8 @@ async def find(
         mtime_min, mtime_max = _parse_mtime(mtime)
     name_exclude = _extract_not_name(texts)
     or_names = _extract_or_names(name, texts)
-    md_min = int(mindepth) if mindepth is not None else None
+    md_min = (_parse_depth(mindepth, "-mindepth")
+              if mindepth is not None else None)
     results = await find_impl(
         accessor,
         search_path,

@@ -173,6 +173,11 @@ jobs:
           ./python/.venv/bin/python integ/lancedb.py > /tmp/lancedb.out
           diff integ/truth_lancedb.txt /tmp/lancedb.out
 
+      - name: Run find arg-error suite (SaaS backends, dummy creds) and diff
+        run: |
+          ./python/.venv/bin/python integ/find_arg_errors.py > /tmp/fae.out
+          diff integ/truth_find_arg_errors.txt /tmp/fae.out
+
   integ-ts:
     needs: changes
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.outputs.ts == 'true') }}
@@ -300,6 +305,12 @@ jobs:
         run: |
           pnpm exec tsx lancedb.ts > /tmp/ts-lancedb.out
           diff truth_lancedb.txt /tmp/ts-lancedb.out
+
+      - name: Run find arg-error suite (SaaS backends, dummy creds) and diff
+        working-directory: integ
+        run: |
+          pnpm exec tsx find_arg_errors.ts > /tmp/ts-fae.out
+          diff truth_find_arg_errors.txt /tmp/ts-fae.out
 
   integ-database:
     needs: changes
