@@ -15,6 +15,7 @@
 import posixpath
 
 from mirage.accessor.onedrive import OneDriveAccessor
+from mirage.cache.context import invalidate_after_write
 from mirage.core.onedrive._client import graph_post, item_url, split_path
 from mirage.types import PathSpec
 
@@ -34,3 +35,4 @@ async def mkdir(accessor: OneDriveAccessor, path: PathSpec) -> None:
         "@microsoft.graph.conflictBehavior": "replace",
     }
     await graph_post(accessor.config, url, body)
+    await invalidate_after_write(path)
