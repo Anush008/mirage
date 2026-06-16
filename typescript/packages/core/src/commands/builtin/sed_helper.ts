@@ -142,7 +142,11 @@ function addrMatches(addr: SedAddr, line: string, lineno: number, total: number)
   if (kind === 'line') return lineno === Number.parseInt(val, 10)
   if (kind === 'last') return lineno === total
   // kind === 'regex'
-  return new RegExp(val).test(line)
+  // Match against the line content, excluding the preserved trailing newline,
+  // so anchored addresses like /^[0-9]*$/ behave per POSIX/GNU sed (and the
+  // Python implementation). See issue #326.
+  const subject = line.endsWith('\n') ? line.slice(0, -1) : line
+  return new RegExp(val).test(subject)
 }
 
 export function translateReplacement(repl: string): string {
@@ -197,7 +201,18 @@ function regexReplace(
   global: boolean,
 ): string {
   const flags = (ignoreCase ? 'i' : '') + (global ? 'g' : '')
-  return text.replace(new RegExp(pat, flags), translateReplacement(repl))
+  const re = new RegExp(pat, flags)
+  // POSIX sed line semantics: `^`/`$` anchor to the line content, not the
+  // line-separator newline that splitLinesKeepEnds preserves. JS `$` (without
+  // the `m` flag) only matches the absolute end of input, so an anchored
+  // substitution like `s/^#[0-9]*$/.../ ` is a no-op against "#123\n". Strip a
+  // single trailing newline before substituting and re-append it afterwards so
+  // the anchors see line content — matching the Python implementation and GNU
+  // sed (whose pattern space excludes the trailing newline). See issue #326.
+  const hasNewline = text.endsWith('\n')
+  const body = hasNewline ? text.slice(0, -1) : text
+  const out = body.replace(re, translateReplacement(repl))
+  return hasNewline ? out + '\n' : out
 }
 
 function splitLinesKeepEnds(text: string): string[] {

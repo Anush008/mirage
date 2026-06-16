@@ -186,6 +186,46 @@ describe.each(NATIVE_BACKENDS)('native sed (%s backend)', (kind) => {
     }
   })
 
+  it('sed anchored substitution matches native', async () => {
+    // Regression for #326: ^/$ must anchor per line, not at buffer ends.
+    const env = makeEnv(kind)
+    try {
+      const data = ENC.encode('#123\nls\n')
+      const m = await env.mirage("sed 's/^#[0-9]*$/#TS/'", data)
+      const n = await env.native("sed 's/^#[0-9]*$/#TS/'", data)
+      expect(m).toBe(n)
+      expect(m).toBe('#TS\nls\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
+  it('sed -E anchored substitution matches native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const data = ENC.encode('#123\nls\n')
+      const m = await env.mirage("sed -E 's/^#[0-9]+$/#TS/'", data)
+      const n = await env.native("sed -E 's/^#[0-9]+$/#TS/'", data)
+      expect(m).toBe(n)
+      expect(m).toBe('#TS\nls\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
+  it('sed anchored address matches native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const data = ENC.encode('12\nab\n34\n')
+      const m = await env.mirage("sed '/^[0-9]*$/d'", data)
+      const n = await env.native("sed '/^[0-9]*$/d'", data)
+      expect(m).toBe(n)
+      expect(m).toBe('ab\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
   it('sed -i edits file in place', async () => {
     const env = makeEnv(kind)
     try {

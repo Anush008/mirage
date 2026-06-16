@@ -461,10 +461,9 @@ export const CASES: ReadonlyArray<readonly [string, string]> = [
   ['bash_history_after_find', "grep -v '^#' /.bash_history | tail -n 1"],
   // GNU bash histfile layout: a `#<epoch>` comment line per command.
   // The timestamp is volatile, so normalize it to `#TS` to assert the
-  // structure deterministically. Uses the unanchored pattern because TS
-  // sed mishandles `^...$` anchors (strukto-ai/mirage#326); revert to
-  // `s/^#[0-9]*$/#TS/` once that is fixed.
-  ['bash_history_format', "cat /.bash_history | sed 's/#[0-9][0-9]*/#TS/' | tail -n 4"],
+  // structure deterministically. The anchored pattern only matches lines
+  // that consist solely of `#<digits>` (the timestamp comments).
+  ['bash_history_format', "cat /.bash_history | sed 's/^#[0-9]*$/#TS/' | tail -n 4"],
 ];
 
 export const EXIT_CODE_CASES: ReadonlyArray<readonly [string, string]> = [
