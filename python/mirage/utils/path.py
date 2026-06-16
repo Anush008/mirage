@@ -82,17 +82,33 @@ def rebase_display(paths: list[str], original: str,
                    display: str | None) -> list[str]:
     """Rewrite the base of walked output paths to the as-typed form.
 
-    Used by walkers like ``find``: results are absolute (start path plus
-    subpath), but when the start path was typed relatively the output
-    should show it that way (``find .`` -> ``./sub/x``, not ``/data/sub/x``).
+    Used by walkers like ``find``/``grep -r``: results are absolute (start
+    path plus subpath), but when the start path was typed relatively the
+    output should show it that way. Maps :func:`rebase_one` over ``paths``.
+
+    Because :func:`rebase_one` only rewrites the leading base prefix, this
+    also works on formatted lines whose path is the prefix, e.g. grep's
+    ``path:line``.
+
+    Example::
+
+        rebase_display(["/data/sub/x", "/data/y"], "/data", ".")
+            -> ["./sub/x", "./y"]
+        rebase_display(["/data/sub/x:hit"], "/data/sub", "sub")
+            -> ["sub/x:hit"]
+        rebase_display(["/data/x"], "/data", "/data")   # absolute arg
+            -> ["/data/x"]                              # unchanged
 
     Args:
-        paths: Absolute result paths produced by walking ``original``.
-        original: The resolved absolute start path.
-        display: The as-typed start path, or ``None`` to leave paths as-is.
+        paths (list[str]): Absolute result paths (or ``path:...`` lines)
+            produced by walking ``original``.
+        original (str): The resolved absolute start path.
+        display (str | None): The as-typed start path, or ``None``/equal to
+            leave ``paths`` unchanged (the absolute-argument case).
 
     Returns:
-        Paths with the ``original`` base replaced by ``display``.
+        list[str]: ``paths`` with each ``original`` base replaced by
+        ``display``.
     """
     if display is None or display == original:
         return paths
@@ -102,13 +118,26 @@ def rebase_display(paths: list[str], original: str,
 def rebase_one(path: str, original: str, display: str | None) -> str:
     """Rewrite a single path's ``original`` base to the as-typed ``display``.
 
+    Only the leading ``original`` prefix is rewritten, so any suffix after
+    the path (e.g. grep's ``:line``) is preserved untouched.
+
+    Example::
+
+        rebase_one("/data/sub/x", "/data", ".")      -> "./sub/x"
+        rebase_one("/data/sub", "/data/sub", "sub")  -> "sub"
+        rebase_one("/data/x:hit", "/data", ".")      -> "./x:hit"
+        rebase_one("/other/x", "/data", ".")         -> "/other/x"  # no match
+        rebase_one("/data/x", "/data", None)         -> "/data/x"   # absolute
+
     Args:
-        path: An absolute path at or under ``original``.
-        original: The resolved absolute base (traversal root).
-        display: The as-typed base, or ``None``/equal to leave ``path`` as-is.
+        path (str): An absolute path at or under ``original`` (optionally with
+            a trailing ``:...`` suffix).
+        original (str): The resolved absolute base (traversal root).
+        display (str | None): The as-typed base, or ``None``/equal to leave
+            ``path`` unchanged.
 
     Returns:
-        ``path`` with its ``original`` base replaced by ``display``.
+        str: ``path`` with its ``original`` base replaced by ``display``.
     """
     if display is None or display == original:
         return path
