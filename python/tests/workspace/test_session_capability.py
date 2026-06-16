@@ -73,17 +73,18 @@ def test_allowed_session_can_write_to_its_mount():
     assert a._store.files.get("/y.txt") == b"new\n"
 
 
-def test_observer_prefix_always_allowed():
+def test_history_view_always_allowed():
     a = _seed("x.txt", b"hi")
     ws = Workspace({"/a": a})
     ws.create_session("agent", allowed_mounts=frozenset({"/a"}))
 
     async def run():
-        return await ws.execute("ls /.sessions", session_id="agent")
+        await ws.execute("ls /a", session_id="agent")
+        return await ws.execute("history", session_id="agent")
 
     io = asyncio.run(run())
     assert io.exit_code == 0, (
-        f"observer prefix should always be readable, got {io}")
+        f"history view should always be reachable, got {io}")
 
 
 def test_ops_blocks_programmatic_read_outside_allowlist():

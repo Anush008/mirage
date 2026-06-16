@@ -38,9 +38,9 @@ flowchart TD
 await ws.snapshot("run.tar")
 await ws.snapshot("run.tar.gz", compress="gz")
 
-# replay — sync construction; drift check fires on first dispatch/execute
-restored = Workspace.load("run.tar")                          # STRICT default
-restored = Workspace.load("run.tar", drift_policy=DriftPolicy.OFF)
+# replay — drift check fires on first dispatch/execute
+restored = await Workspace.load("run.tar")                    # STRICT default
+restored = await Workspace.load("run.tar", drift_policy=DriftPolicy.OFF)
 
 # in-process duplicate (shares remote resources, restores local content fresh)
 cp = await ws.copy()
@@ -113,7 +113,7 @@ Paths that carry a revision pin are skipped — the pinned read serves the exact
 | `STRICT` *(default)* | Raise `ContentDriftError` on first mismatch. | Reproducing an agent run; you want to know the world moved. |
 | `OFF` | Skip drift checks entirely. Evict snapshot cache for fingerprinted paths so reads serve current. | You only wanted the workspace skeleton, not the bytes. |
 
-Pass via `Workspace.load(..., drift_policy=DriftPolicy.OFF)`.
+Pass via `await Workspace.load(..., drift_policy=DriftPolicy.OFF)`.
 
 ## How It Composes With Caching
 

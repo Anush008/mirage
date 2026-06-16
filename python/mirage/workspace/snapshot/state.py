@@ -16,18 +16,19 @@ import importlib
 import importlib.metadata
 import tempfile
 
+from mirage.observe.log_entry import EVENT_CLEAR, EVENT_COMMAND, EVENT_DELETE
+from mirage.resource.history import HISTORY_PREFIX
 from mirage.resource.loader import load_backend_class
 from mirage.resource.registry import REGISTRY
 from mirage.resource.secrets import has_redacted_secret
 from mirage.shell.job_table import Job, JobStatus
 from mirage.types import (CacheKey, ConsistencyPolicy, JobKey, MountKey,
-                          MountMode, NodeKey, RecordKey, ResourceName,
-                          ResourceStateKey, SessionKey, StateKey)
+                          MountMode, ResourceName, ResourceStateKey,
+                          SessionKey, StateKey)
 from mirage.workspace.snapshot.config import MountArgs
 from mirage.workspace.snapshot.drift import (capture_fingerprints,
                                              live_only_mount_prefixes)
 from mirage.workspace.snapshot.utils import FORMAT_VERSION, norm_mount_prefix
-from mirage.workspace.types import ExecutionNode, ExecutionRecord
 
 
 def _mirage_version() -> str:
@@ -37,10 +38,8 @@ def _mirage_version() -> str:
         return "unknown"
 
 
-def to_state_dict(ws) -> dict:
-    auto_prefixes = {"/dev/"}
-    if ws.observer is not None:
-        auto_prefixes.add(norm_mount_prefix(ws.observer.prefix))
+async def to_state_dict(ws) -> dict:
+    auto_prefixes = {"/dev/", norm_mount_prefix(HISTORY_PREFIX)}
 
     mounts_state = []
     for idx, m in enumerate(mt for mt in ws._registry.mounts()
@@ -65,8 +64,10 @@ def to_state_dict(ws) -> dict:
         CacheKey.SIZE: e.size,
     } for k, e in cache._entries.items()]
 
-    history_records = ([_record_to_dict(r) for r in ws.history.entries()]
-                       if ws.history is not None else None)
+    history_events = [
+        e for e in await ws.observer.events()
+        if e.get("type") in (EVENT_COMMAND, EVENT_CLEAR, EVENT_DELETE)
+    ]
 
     finished_jobs = [
         _job_to_dict(j) for j in ws.job_table.list_jobs()
@@ -89,7 +90,7 @@ def to_state_dict(ws) -> dict:
             CacheKey.MAX_DRAIN_BYTES: cache.max_drain_bytes,
             CacheKey.ENTRIES: cache_entries,
         },
-        StateKey.HISTORY: history_records,
+        StateKey.HISTORY: history_events,
         StateKey.JOBS: finished_jobs,
         StateKey.FINGERPRINTS: fingerprints,
         StateKey.LIVE_ONLY_MOUNTS: live_only_mounts,
@@ -141,7 +142,7 @@ def build_mount_args(state: dict, resources: dict | None = None) -> MountArgs:
     )
 
 
-def apply_state_dict(ws, state: dict) -> None:
+async def apply_state_dict(ws, state: dict) -> None:
     """Restore post-construction state into an already-built Workspace.
 
     Restores: resource load_state (content, fresh disk root, etc.),
@@ -166,7 +167,7 @@ def apply_state_dict(ws, state: dict) -> None:
                                      ws._default_agent_id)
 
     _restore_cache(ws, state)
-    _restore_history(ws, state)
+    await _restore_history(ws, state)
     _restore_jobs(ws, state)
 
 
@@ -208,12 +209,10 @@ def _restore_cache(ws, state: dict) -> None:
         cache._cache_size += entry.get(CacheKey.SIZE, len(data))
 
 
-def _restore_history(ws, state: dict) -> None:
-    if not state.get(StateKey.HISTORY) or ws.history is None:
-        return
-    ws.history._entries = []
-    for rec_d in state[StateKey.HISTORY]:
-        ws.history.append(_record_from_dict(rec_d))
+async def _restore_history(ws, state: dict) -> None:
+    # Always load (load_events clears first): a snapshot with empty
+    # history still rewinds the recorder, same as the cache clear.
+    await ws.observer.load_events(state.get(StateKey.HISTORY) or [])
 
 
 def _restore_jobs(ws, state: dict) -> None:
@@ -222,52 +221,6 @@ def _restore_jobs(ws, state: dict) -> None:
         max_id = max(max_id, job_d.get(JobKey.ID, 0))
         ws.job_table._jobs[job_d[JobKey.ID]] = _job_from_dict(job_d)
     ws.job_table._next_id = max_id + 1
-
-
-def _record_to_dict(record) -> dict:
-    return {
-        RecordKey.AGENT: record.agent,
-        RecordKey.COMMAND: record.command,
-        RecordKey.STDOUT: record.stdout,
-        RecordKey.STDIN: record.stdin,
-        RecordKey.EXIT_CODE: record.exit_code,
-        RecordKey.TREE: _node_to_dict(record.tree),
-        RecordKey.TIMESTAMP: record.timestamp,
-        RecordKey.SESSION_ID: record.session_id,
-    }
-
-
-def _record_from_dict(d: dict):
-    return ExecutionRecord(
-        agent=d[RecordKey.AGENT],
-        command=d[RecordKey.COMMAND],
-        stdout=d.get(RecordKey.STDOUT, b"") or b"",
-        stdin=d.get(RecordKey.STDIN),
-        exit_code=d.get(RecordKey.EXIT_CODE, 0),
-        tree=_node_from_dict(d.get(RecordKey.TREE) or {}),
-        timestamp=d.get(RecordKey.TIMESTAMP, 0.0),
-        session_id=d.get(RecordKey.SESSION_ID, "default"),
-    )
-
-
-def _node_to_dict(node) -> dict:
-    return {
-        NodeKey.COMMAND: node.command,
-        NodeKey.OP: node.op,
-        NodeKey.STDERR: node.stderr,
-        NodeKey.EXIT_CODE: node.exit_code,
-        NodeKey.CHILDREN: [_node_to_dict(c) for c in node.children],
-    }
-
-
-def _node_from_dict(d: dict):
-    return ExecutionNode(
-        command=d.get(NodeKey.COMMAND),
-        op=d.get(NodeKey.OP),
-        stderr=d.get(NodeKey.STDERR, b"") or b"",
-        exit_code=d.get(NodeKey.EXIT_CODE, 0),
-        children=[_node_from_dict(c) for c in d.get(NodeKey.CHILDREN, [])],
-    )
 
 
 def _job_to_dict(job) -> dict:

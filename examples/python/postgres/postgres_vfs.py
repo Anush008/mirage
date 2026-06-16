@@ -100,11 +100,12 @@ async def main():
         except Exception as exc:
             print(f"  guard fired: {str(exc)[:160]}")
 
-        print("\n--- session observer ---")
-        day_folders = vos.listdir("/.sessions")
-        log_entries = vos.listdir(day_folders[0]) if day_folders else []
-        for e in log_entries:
-            print(f"  {e}")
+        print("\n--- bash history ---")
+        with open("/.bash_history") as f:
+            for i, line in enumerate(f):
+                if i >= 6:
+                    break
+                print(f"  {line.rstrip()[:120]}")
 
         records = ws.ops.records
         total = sum(r.bytes for r in records)

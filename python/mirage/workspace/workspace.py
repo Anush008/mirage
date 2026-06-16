@@ -16,7 +16,6 @@ import asyncio
 import builtins
 import logging
 import sys
-import time
 from collections.abc import AsyncIterator
 from functools import partial
 from typing import Any
@@ -24,7 +23,6 @@ from typing import Any
 from mirage.cache.file.config import CacheConfig, RedisCacheConfig
 from mirage.cache.file.ram import RAMFileCacheStore
 from mirage.cache.index import IndexConfig
-from mirage.commands.builtin.general import HISTORY_COMMANDS
 from mirage.commands.builtin.utils.safeguard import (CommandTimeoutError,
                                                      run_with_timeout)
 from mirage.commands.errors import FindParseError, UsageError
@@ -35,15 +33,15 @@ try:
 except ImportError:
     RedisFileCacheStore = None  # type: ignore[misc, assignment]
 from mirage.io import IOResult
-from mirage.observe.context import start_recording, stop_recording
+from mirage.observe.context import RecordingScope
 from mirage.observe.observer import Observer
-from mirage.observe.record import OpRecord
+from mirage.observe.store import ObserverStore
 from mirage.ops import Ops
 from mirage.ops.open import make_open
 from mirage.ops.os_patch import make_os_module
 from mirage.provision import ProvisionResult
 from mirage.resource.base import BaseResource
-from mirage.resource.ram import RAMResource
+from mirage.resource.history import HISTORY_PREFIX, HistoryViewResource
 from mirage.shell.job_table import JobTable
 from mirage.shell.parse import find_syntax_error, parse
 from mirage.types import (DEFAULT_AGENT_ID, DEFAULT_SESSION_ID,
@@ -54,7 +52,6 @@ from mirage.workspace.dispatcher import Dispatcher
 from mirage.workspace.executor.fs_error import format_fs_error
 from mirage.workspace.file_prompt import build_file_prompt
 from mirage.workspace.fuse import FuseManager
-from mirage.workspace.history import ExecutionHistory
 from mirage.workspace.mount import Mount, MountRegistry
 from mirage.workspace.node import provision_node, run_command_tree
 from mirage.workspace.session import (Session, SessionManager,
@@ -66,7 +63,6 @@ from mirage.workspace.snapshot import (ContentDriftError, apply_state_dict,
                                        read_tar, requires_resource_override)
 from mirage.workspace.snapshot import snapshot as _write_snapshot
 from mirage.workspace.snapshot import to_state_dict
-from mirage.workspace.types import ExecutionNode, ExecutionRecord
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +82,10 @@ class Workspace:
         index: IndexConfig | None = None,
         mode: MountMode = MountMode.READ,
         consistency: ConsistencyPolicy = ConsistencyPolicy.LAZY,
-        history: int | None = 100,
         session_id: str = DEFAULT_SESSION_ID,
         agent_id: str = DEFAULT_AGENT_ID,
         fuse_mounts: dict[str, bool | str] | None = None,
-        observe: BaseResource | None = None,
-        observe_prefix: str = "/.sessions",
+        observe: ObserverStore | None = None,
     ) -> None:
         self._registry = MountRegistry()
         if isinstance(cache, RedisCacheConfig):
@@ -145,27 +139,17 @@ class Workspace:
 
         self._fuse = FuseManager()
         self._fuse_managers: dict[str, FuseManager] = {}
-        self.history: ExecutionHistory = ExecutionHistory(
-            max_entries=history if history is not None else 100)
 
-        observe_resource = (observe if observe is not None else RAMResource())
-        self.observer = Observer(resource=observe_resource,
-                                 prefix=observe_prefix)
-        self._registry.mount(observe_prefix, observe_resource, MountMode.READ)
+        self.observer = Observer(store=observe)
+        self._registry.mount(HISTORY_PREFIX,
+                             HistoryViewResource(self.observer),
+                             MountMode.READ)
 
         self._ops = Ops(self._registry.ops_mounts(),
                         on_write=self._invalidate_after_write_by_path,
                         observer=self.observer,
                         agent_id=agent_id,
                         session_id=session_id)
-
-        for m in self._registry.mounts():
-            for rc in HISTORY_COMMANDS:
-                m.register_general(rc)
-        default = self._registry.default_mount
-        if default is not None:
-            for rc in HISTORY_COMMANDS:
-                default.register_general(rc)
 
         if fuse_mounts:
             for prefix, target in fuse_mounts.items():
@@ -175,6 +159,14 @@ class Workspace:
                 point = target if isinstance(target, str) else None
                 manager.setup(self, root_prefix=prefix, mountpoint=point)
                 self._fuse_managers[prefix] = manager
+
+    async def history(self) -> list[dict]:
+        """Command events recorded by the hidden recorder.
+
+        Returns:
+            list[dict]: All sessions' command events, timestamp order.
+        """
+        return await self.observer.command_events()
 
     @property
     def ops(self) -> Ops:
@@ -228,11 +220,9 @@ class Workspace:
             raise ValueError(f"cannot unmount cache root: {prefix!r}")
         if norm == "/dev/":
             raise ValueError("cannot unmount reserved prefix: '/dev/'")
-        observer_norm = ("/" + self.observer.prefix.strip("/") +
-                         "/" if self.observer.prefix.strip("/") else "/")
-        if norm == observer_norm:
-            raise ValueError(f"cannot unmount observer prefix: "
-                             f"{self.observer.prefix!r}")
+        if norm == HISTORY_PREFIX + "/":
+            raise ValueError(f"cannot unmount history view: "
+                             f"{HISTORY_PREFIX!r}")
         removed = self._registry.unmount(prefix)
         self._ops.unmount(prefix)
         still_mounted = any(m.resource is removed.resource
@@ -350,11 +340,12 @@ class Workspace:
         await _write_snapshot(self, target, compress=compress)
 
     @classmethod
-    def load(cls,
-             source,
-             *,
-             resources: dict | None = None,
-             drift_policy: DriftPolicy = DriftPolicy.STRICT) -> "Workspace":
+    async def load(
+            cls,
+            source,
+            *,
+            resources: dict | None = None,
+            drift_policy: DriftPolicy = DriftPolicy.STRICT) -> "Workspace":
         """Reconstruct a Workspace from a tar.
 
         For every recorded read:
@@ -382,12 +373,12 @@ class Workspace:
                 disables drift checking and evicts snapshot cache for
                 fingerprinted paths.
         """
-        return cls.from_state(read_tar(source),
-                              resources=resources,
-                              drift_policy=drift_policy)
+        return await cls.from_state(read_tar(source),
+                                    resources=resources,
+                                    drift_policy=drift_policy)
 
     @classmethod
-    def from_state(
+    async def from_state(
             cls,
             state: dict,
             *,
@@ -409,7 +400,7 @@ class Workspace:
                 disables drift checking and evicts snapshot cache for
                 fingerprinted paths.
         """
-        ws = cls._from_state(state, resources=resources)
+        ws = await cls._from_state(state, resources=resources)
         install_fingerprints(ws,
                              state.get(StateKey.FINGERPRINTS) or [],
                              drift_policy)
@@ -429,10 +420,8 @@ class Workspace:
         # Only reuse resources whose state has redacted secrets or connection
         # material. Local content resources (RAM, Disk) are reconstructed
         # fresh so the copy's writes don't clobber the original's data.
-        state = to_state_dict(self)
-        auto_prefixes = {"/dev/"}
-        if self.observer is not None:
-            auto_prefixes.add(norm_mount_prefix(self.observer.prefix))
+        state = await to_state_dict(self)
+        auto_prefixes = {"/dev/", norm_mount_prefix(HISTORY_PREFIX)}
         prefix_to_resource = {
             m.prefix: m.resource
             for m in self._registry.mounts() if m.prefix not in auto_prefixes
@@ -442,19 +431,19 @@ class Workspace:
             for m in state["mounts"] if requires_resource_override(m)
             and m["prefix"] in prefix_to_resource
         }
-        return type(self)._from_state(state, resources=resources)
+        return await type(self)._from_state(state, resources=resources)
 
     @classmethod
-    def _from_state(cls,
-                    state: dict,
-                    *,
-                    resources: dict | None = None) -> "Workspace":
+    async def _from_state(cls,
+                          state: dict,
+                          *,
+                          resources: dict | None = None) -> "Workspace":
         args = build_mount_args(state, resources)
         ws = cls(args.mount_args,
                  consistency=args.consistency,
                  session_id=args.default_session_id,
                  agent_id=args.default_agent_id)
-        apply_state_dict(ws, state)
+        await apply_state_dict(ws, state)
         return ws
 
     def __deepcopy__(self, memo) -> "Workspace":
@@ -484,16 +473,14 @@ class Workspace:
 
         The cache mount (where text-processing commands like ``wc``
         without a path argument resolve), the device mount, and the
-        observer log are infrastructure: they hold no user
+        history view are infrastructure: they hold no user
         credentials, and rejecting them would break common shell
-        idioms or audit logging.
+        idioms or the history builtin.
         """
-        prefixes = {"/dev"}
+        prefixes = {"/dev", HISTORY_PREFIX}
         default_mount = self._registry.default_mount
         if default_mount is not None:
             prefixes.add("/" + default_mount.prefix.strip("/"))
-        if self.observer is not None:
-            prefixes.add("/" + self.observer.prefix.strip("/"))
         return prefixes
 
     def get_session(self, session_id: str) -> Session:
@@ -564,43 +551,19 @@ class Workspace:
     async def _invalidate_after_write_by_path(self, path: str) -> None:
         await self._dispatcher.invalidate_after_write_by_path(path)
 
-    async def _record_execution(
-        self,
-        command: str,
-        io: IOResult,
-        exec_node: ExecutionNode,
-        agent_id: str,
-        session_id: str,
-        stdin: AsyncIterator[bytes] | bytes | None,
-        provision: bool,
-    ) -> None:
+    def _session_cwd(self, session_id: str) -> str | None:
         try:
-            session_cwd = self._session_mgr.get(session_id).cwd
+            return self._session_mgr.get(session_id).cwd
         except KeyError:
-            session_cwd = None
-        if not provision and self.observer is not None and exec_node.records:
-            for rec in exec_node.records:
-                await self.observer.log_op(rec, agent_id, session_id,
-                                           session_cwd)
-        if not provision:
-            stdin_bytes = stdin if isinstance(stdin, bytes) else None
-            exec_record = ExecutionRecord(
-                agent=agent_id,
-                command=command,
-                stdout=await io.materialize_stdout(),
-                stdin=stdin_bytes,
-                exit_code=io.exit_code,
-                tree=exec_node,
-                timestamp=time.time(),
-                session_id=session_id,
-            )
-            self.history.append(exec_record)
-            if self.observer is not None:
-                await self.observer.log_command(exec_record, session_cwd)
+            return None
 
     async def _exec_recursion(self, cancel: asyncio.Event | None, cmd: str,
                               **opts: Any) -> Any:
-        return await self.execute(cmd, cancel=cancel, **opts)
+        # The executor's internal eval ($(), source, eval, xargs, ...):
+        # never a typed line, so it must not record a history entry or
+        # open its own recording context (GNU: history is appended by
+        # the line reader, the evaluator can't touch it).
+        return await self.execute(cmd, cancel=cancel, record=False, **opts)
 
     async def execute(
         self,
@@ -612,6 +575,7 @@ class Workspace:
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         cancel: asyncio.Event | None = None,
+        record: bool = True,
     ) -> IOResult | ProvisionResult:
         """Execute a shell command in the workspace.
 
@@ -633,6 +597,11 @@ class Workspace:
                 mid-flight. When set, the executor raises MirageAbortError
                 at the next gate (entry to each node) and races inside
                 blocking sleeps so cancellation is observed promptly.
+            record: When False, run without logging a history entry or
+                opening a recording context; ops emitted by the command
+                flow into the caller's recorder. Used by the executor's
+                internal evaluations and available to SDK callers that
+                need an unrecorded run.
         """
         if cancel is not None and cancel.is_set():
             raise MirageAbortError()
@@ -654,8 +623,11 @@ class Workspace:
             effective_session = session
         self._current_agent_id = agent_id
         io = IOResult()
-        exec_node = ExecutionNode(command=command, exit_code=0)
-        records: list[OpRecord] = []
+        # The line-reader decision (GNU: history is appended where the
+        # typed line is read, never inside the evaluator). Internal
+        # evaluations and provision runs get an inert scope.
+        is_line = record and not provision
+        scope = RecordingScope(active=is_line)
 
         exec_recursion = partial(self._exec_recursion, cancel)
 
@@ -668,9 +640,6 @@ class Workspace:
                 err = (f"mirage: syntax error near {snippet!r}\n".encode()
                        if snippet else b"mirage: syntax error in command\n")
                 io = IOResult(exit_code=2, stderr=err)
-                exec_node = ExecutionNode(command=command,
-                                          stderr=err,
-                                          exit_code=2)
                 return io
             if provision:
                 prov_name = command.strip().split()[0] if command.strip(
@@ -683,8 +652,7 @@ class Workspace:
                     provision_node(self._registry, self.dispatch,
                                    exec_recursion, ast, effective_session),
                     prov_timeout, prov_name)
-            records = start_recording()
-            io, exec_node = await run_command_tree(
+            io, _ = await run_command_tree(
                 self.dispatch,
                 self._registry,
                 self.job_table,
@@ -693,28 +661,18 @@ class Workspace:
                 ast,
                 effective_session,
                 stdin,
-                self.history,
                 cancel,
             )
             session.last_exit_code = io.exit_code
-            stop_recording()
-            self._ops.records.extend(records)
-            exec_node.records = records
             await self.apply_io(io)
             return io
         except CommandTimeoutError as exc:
-            stop_recording()
             logger.debug("command %r timed out after %ss", exc.command,
                          exc.seconds)
             if cancel is not None:
                 cancel.set()
             msg = (str(exc) + "\n").encode()
             io = IOResult(exit_code=124, stderr=msg)
-            self._ops.records.extend(records)
-            exec_node = ExecutionNode(command=command,
-                                      stderr=msg,
-                                      exit_code=124,
-                                      records=records)
             session.last_exit_code = 124
             return io
         except (MirageAbortError, ContentDriftError):
@@ -722,26 +680,29 @@ class Workspace:
         except FindParseError as exc:
             msg = f"{exc}\n".encode()
             io = IOResult(exit_code=1, stderr=msg)
-            exec_node = ExecutionNode(command=command, stderr=msg, exit_code=1)
             return io
         except UsageError as exc:
             msg = f"{exc}\n".encode()
             io = IOResult(exit_code=2, stderr=msg)
-            exec_node = ExecutionNode(command=command, stderr=msg, exit_code=2)
             return io
         except OSError as exc:
             cmd_name = command.split()[0] if command.split() else command
             msg = format_fs_error(cmd_name, exc)
             io = IOResult(exit_code=1, stderr=msg)
-            exec_node = ExecutionNode(command=command, stderr=msg, exit_code=1)
             return io
         except Exception as exc:
             io = IOResult(exit_code=1, stderr=str(exc).encode())
-            exec_node = ExecutionNode(command=command,
-                                      stderr=str(exc).encode(),
-                                      exit_code=1)
             return io
         finally:
+            # One rule on every path: an op that happened is always
+            # accounted, in byte accounting (which feeds snapshot
+            # fingerprints/drift) and as observer op events. The
+            # command event's exit_code says whether the line that
+            # emitted them succeeded.
+            scope.close()
             reset_current_session(session_token)
-            await self._record_execution(command, io, exec_node, agent_id,
-                                         session_id, stdin, provision)
+            self._ops.records.extend(scope.records)
+            if is_line:
+                await self.observer.log_execution(
+                    command, io, scope.records, agent_id, session_id,
+                    self._session_cwd(session_id))

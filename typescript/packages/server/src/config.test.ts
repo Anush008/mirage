@@ -155,15 +155,6 @@ describe('configToWorkspaceArgs', () => {
     expect(args.options.cache).toBeInstanceOf(RedisFileCacheStore)
   })
 
-  it('threads the history cap into options.historyLimit', async () => {
-    const cfg = loadWorkspaceConfig({
-      mounts: { '/': { resource: 'ram' } },
-      history: 7,
-    })
-    const args = await configToWorkspaceArgs(cfg)
-    expect(args.options.historyLimit).toBe(7)
-  })
-
   it('coerces consistency (default lazy, accepts always, rejects junk)', async () => {
     const dflt = await configToWorkspaceArgs(
       loadWorkspaceConfig({ mounts: { '/': { resource: 'ram' } } }),

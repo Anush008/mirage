@@ -214,19 +214,19 @@ async def main() -> None:
         print(f"  saved → {snap} ({os.path.getsize(snap)} bytes)")
 
         try:
-            Workspace.load(snap)
+            await Workspace.load(snap)
             print("  ✗ load() should have raised without resources=")
         except ValueError as e:
             print(f"  ✓ load() w/o resources raises: "
                   f"{str(e).splitlines()[0][:70]}…")
 
         # Load into a fresh Redis prefix (same instance, isolated namespace)
-        loaded = Workspace.load(snap,
-                                resources={
-                                    "/data":
-                                    RedisResource(url=REDIS_URL,
-                                                  key_prefix=dst_prefix)
-                                })
+        loaded = await Workspace.load(snap,
+                                      resources={
+                                          "/data":
+                                          RedisResource(url=REDIS_URL,
+                                                        key_prefix=dst_prefix)
+                                      })
         r = await loaded.execute("ls /data/")
         print(f"  loaded ws ls /data: "
               f"{(await r.stdout_str()).strip()[:60]}…")

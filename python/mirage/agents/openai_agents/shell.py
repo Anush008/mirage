@@ -12,22 +12,8 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from mirage.io.types import IOResult
+from mirage.agents.io_text import io_to_str
 from mirage.workspace.workspace import Workspace
-
-
-def _decode(value: bytes | None) -> str:
-    if value is None:
-        return ""
-    return value.decode("utf-8", errors="replace")
-
-
-def _io_to_str(io: IOResult) -> str:
-    stdout = _decode(io.stdout)
-    stderr = _decode(io.stderr)
-    if stderr:
-        return f"{stdout}\n{stderr}" if stdout else stderr
-    return stdout
 
 
 class MirageShellExecutor:
@@ -45,5 +31,5 @@ class MirageShellExecutor:
         outputs: list[str] = []
         for cmd in commands:
             io = await self._ws.execute(cmd)
-            outputs.append(_io_to_str(io))
+            outputs.append(io_to_str(io))
         return "\n".join(outputs)

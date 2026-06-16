@@ -36,7 +36,7 @@ classifiers = [
 
 dependencies = [
     "aiofiles>=24.1.0",
-    "aiohttp>=3.13.3",
+    "aiohttp>=3.14.0",
     "fastapi>=0.135.1",
     "httpx>=0.28.1",
     "python-multipart>=0.0.27",
@@ -47,7 +47,7 @@ dependencies = [
     "typer>=0.12.0",
     "uvicorn[standard]>=0.41.0",
     "jq>=1.11.0",
-    "pyjwt[crypto]>=2.10",
+    "pyjwt[crypto]>=2.13.0",
     "dulwich>=1.2.5",
 ]
 
@@ -134,6 +134,9 @@ openhands   = [
 # --- agno ---
 agno        = ["agno>=2.4.0"]
 
+# --- claude-agent-sdk ---
+claude-agent-sdk = ["claude-agent-sdk>=0.1.0"]
+
 # --- camel ---
 camel       = ["camel-ai>=0.2.40,<0.3", "markitdown>=0.1.5"]
 
@@ -166,6 +169,7 @@ all = [
     "mirage-ai[deepagents]",
     "mirage-ai[openhands]",
     "mirage-ai[agno]",
+    "mirage-ai[claude-agent-sdk]",
     "mirage-ai[daytona]",
 ]
 lancedb = [

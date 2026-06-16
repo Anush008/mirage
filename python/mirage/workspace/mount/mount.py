@@ -375,7 +375,6 @@ class Mount:
         stdin: ByteSource | None = None,
         cwd: str = "/",
         dispatch: Callable | None = None,
-        history: Any = None,
         session_id: str | None = None,
         env: dict[str, str] | None = None,
         exec_allowed: bool = True,
@@ -442,8 +441,6 @@ class Mount:
             kw["stdin"] = stdin
         if dispatch is not None:
             kw["dispatch"] = dispatch
-        if history is not None:
-            kw["history"] = history
         if session_id is not None:
             kw["session_id"] = session_id
         if env is not None:

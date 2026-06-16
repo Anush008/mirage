@@ -35,7 +35,6 @@ async def run_command_tree(
     ast: Any,
     session: Session,
     stdin: Any,
-    history: object,
     cancel: asyncio.Event | None,
 ) -> tuple[IOResult, ExecutionNode]:
     """Run a parsed command tree and finalize its output stream.
@@ -43,11 +42,11 @@ async def run_command_tree(
     Executes the AST root, then applies the value barrier and the
     command safeguard, folding the safeguard's stderr and exit code
     into the result. This is the seam between the Workspace shell
-    (sessions, drift, history, recording) and the
-    command executor: a caller hands in a parsed tree plus its
-    dependencies and gets back the resolved result. Byte recording is
-    the caller's responsibility, so the active recorder spans the
-    stream consumption that happens inside the barrier here.
+    (sessions, drift, recording) and the command executor: a caller
+    hands in a parsed tree plus its dependencies and gets back the
+    resolved result. Byte recording is the caller's responsibility, so
+    the active recorder spans the stream consumption that happens
+    inside the barrier here.
 
     Args:
         dispatch (Callable): VFS op dispatcher (op, path, **kw).
@@ -58,7 +57,6 @@ async def run_command_tree(
         ast (Any): parsed tree-sitter root node.
         session (Session): shell session state.
         stdin (Any): input stream.
-        history (object): execution history sink.
         cancel (asyncio.Event | None): event used to abort mid-flight.
 
     Returns:
@@ -75,7 +73,6 @@ async def run_command_tree(
         ast,
         session,
         stdin,
-        history=history,
         cancel=cancel,
     )
     stdout = await apply_barrier(stdout, io, BarrierPolicy.VALUE)

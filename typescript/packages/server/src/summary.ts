@@ -12,7 +12,12 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import { normMountPrefix, type Resource, type Workspace } from '@struktoai/mirage-core'
+import {
+  HISTORY_PREFIX,
+  normMountPrefix,
+  type Resource,
+  type Workspace,
+} from '@struktoai/mirage-core'
 import type { WorkspaceEntry } from './registry.ts'
 import type {
   MountSummary,
@@ -22,18 +27,15 @@ import type {
   WorkspaceInternals,
 } from './schemas.ts'
 
-const AUTO_PREFIXES = new Set(['/dev/'])
+const AUTO_PREFIXES = new Set(['/dev/', normMountPrefix(HISTORY_PREFIX)])
 const DESCRIPTION_MAX = 120
 
-function isAutoPrefix(prefix: string, observerPrefix: string): boolean {
-  if (AUTO_PREFIXES.has(prefix)) return true
-  if (prefix === normMountPrefix(observerPrefix)) return true
-  return false
+function isAutoPrefix(prefix: string): boolean {
+  return AUTO_PREFIXES.has(prefix)
 }
 
 function userMounts(ws: Workspace) {
-  const observerPrefix = ws.observer.prefix
-  return ws.mounts().filter((m) => !isAutoPrefix(m.prefix, observerPrefix))
+  return ws.mounts().filter((m) => !isAutoPrefix(m.prefix))
 }
 
 function describeResource(resource: Resource): string {
@@ -42,12 +44,12 @@ function describeResource(resource: Resource): string {
   return raw.slice(0, DESCRIPTION_MAX - 1).trimEnd() + '\u2026'
 }
 
-function buildInternals(ws: Workspace): WorkspaceInternals {
+async function buildInternals(ws: Workspace): Promise<WorkspaceInternals> {
   const cache = ws.cache as typeof ws.cache & { snapshotEntries?: () => unknown[] }
   return {
     cacheBytes: cache.cacheSize,
     cacheEntries: cache.snapshotEntries?.().length ?? 0,
-    historyLength: ws.history.entries().length,
+    historyLength: (await ws.history()).length,
     inFlightJobs: ws.jobTable.listJobs().length,
   }
 }
@@ -64,7 +66,7 @@ export function makeBrief(entry: WorkspaceEntry): WorkspaceBrief {
   }
 }
 
-export function makeDetail(entry: WorkspaceEntry, verbose = false): WorkspaceDetail {
+export async function makeDetail(entry: WorkspaceEntry, verbose = false): Promise<WorkspaceDetail> {
   const ws = entry.runner.ws
   const mounts = userMounts(ws)
   const mountSummaries: MountSummary[] = mounts.map((m) => ({
@@ -85,6 +87,6 @@ export function makeDetail(entry: WorkspaceEntry, verbose = false): WorkspaceDet
     fuseMountpoints,
     mounts: mountSummaries,
     sessions,
-    internals: verbose ? buildInternals(ws) : null,
+    internals: verbose ? await buildInternals(ws) : null,
   }
 }

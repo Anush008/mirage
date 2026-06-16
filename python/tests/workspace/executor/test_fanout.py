@@ -79,13 +79,10 @@ def test_maxdepth_applies_to_child_mount_depth_end_to_end():
     child = RAMResource()
     child._store.dirs.add("/a")
     child._store.files["/a/b.txt"] = b"deep\n"
-    ws = Workspace(
-        resources={
-            "/": (parent, MountMode.EXEC),
-            "/data/": (child, MountMode.EXEC),
-        },
-        history=None,
-    )
+    ws = Workspace(resources={
+        "/": (parent, MountMode.EXEC),
+        "/data/": (child, MountMode.EXEC),
+    }, )
     io = asyncio.run(ws.execute("find / -maxdepth 2"))
     out = (io.stdout if isinstance(io.stdout, bytes) else b"").decode()
     assert "/data/a" in out

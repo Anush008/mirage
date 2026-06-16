@@ -13,18 +13,15 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 from mirage.types import DEFAULT_AGENT_ID, DEFAULT_SESSION_ID
-from mirage.workspace.history import ExecutionHistory
 from mirage.workspace.runner import WorkspaceRunner
 from mirage.workspace.session import Session
-from mirage.workspace.types import ExecutionNode, ExecutionRecord
+from mirage.workspace.types import ExecutionNode
 from mirage.workspace.workspace import Workspace
 
 __all__ = [
     "DEFAULT_AGENT_ID",
     "DEFAULT_SESSION_ID",
-    "ExecutionHistory",
     "ExecutionNode",
-    "ExecutionRecord",
     "Session",
     "Workspace",
     "WorkspaceRunner",

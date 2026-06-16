@@ -206,7 +206,6 @@ async def handle_command(
     stdin: ByteSource | None = None,
     call_stack: CallStack | None = None,
     job_table: JobTable | None = None,
-    history: object = None,
 ) -> tuple[ByteSource | None, IOResult, ExecutionNode]:
     """Execute a simple command.
 
@@ -403,7 +402,6 @@ async def handle_command(
             stdin=stdin,
             cwd=session.cwd,
             dispatch=dispatch,
-            history=history,
             session_id=session.session_id,
             env=session.env,
             exec_allowed=registry.is_exec_allowed(),

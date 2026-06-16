@@ -25,6 +25,10 @@ from mirage.workspace.snapshot import ContentDriftError, install_fingerprints
 from tests.integration.s3_mock import patch_s3_multi
 
 
+def _load(*args, **kwargs):
+    return asyncio.run(Workspace.load(*args, **kwargs))
+
+
 def test_install_fingerprints_pins_revision_and_queues_drift():
     ws = Workspace({"/m": (RAMResource(), MountMode.WRITE)},
                    mode=MountMode.WRITE)
@@ -77,7 +81,7 @@ def test_strict_load_raises_when_s3_etag_drifts(tmp_path):
         asyncio.run(src.snapshot(snap))
         store["data.csv"] = b"VERSION 2 DRIFTED\n"
 
-        dst = Workspace.load(snap, resources={"/s3": S3Resource(_config())})
+        dst = _load(snap, resources={"/s3": S3Resource(_config())})
         with pytest.raises(ContentDriftError) as exc_info:
             asyncio.run(dst.execute("cat /s3/data.csv"))
         assert exc_info.value.path == "/s3/data.csv"
@@ -101,9 +105,9 @@ def test_off_load_serves_drifted_bytes_silently(tmp_path):
         asyncio.run(src.snapshot(snap))
         store["data.csv"] = b"VERSION 2 DRIFTED\n"
 
-        dst = Workspace.load(snap,
-                             resources={"/s3": S3Resource(_config())},
-                             drift_policy=DriftPolicy.OFF)
+        dst = _load(snap,
+                    resources={"/s3": S3Resource(_config())},
+                    drift_policy=DriftPolicy.OFF)
         result = asyncio.run(dst.execute("cat /s3/data.csv"))
         assert b"VERSION 2 DRIFTED" in result.stdout
 
@@ -122,7 +126,7 @@ def test_strict_load_passes_when_etag_unchanged(tmp_path):
         snap = tmp_path / "snap.tar"
         asyncio.run(src.snapshot(snap))
 
-        dst = Workspace.load(snap, resources={"/s3": S3Resource(_config())})
+        dst = _load(snap, resources={"/s3": S3Resource(_config())})
         result = asyncio.run(dst.execute("cat /s3/data.csv"))
         assert b"stable bytes" in result.stdout
 
@@ -145,7 +149,7 @@ def test_unrecorded_path_skips_drift_check(tmp_path):
         snap = tmp_path / "snap.tar"
         asyncio.run(src.snapshot(snap))
 
-        dst = Workspace.load(snap, resources={"/s3": S3Resource(_config())})
+        dst = _load(snap, resources={"/s3": S3Resource(_config())})
         result = asyncio.run(dst.execute("cat /s3/added-later.txt"))
         assert b"not in snapshot" in result.stdout
 
@@ -169,7 +173,7 @@ def test_version_pin_serves_original_bytes_on_versioned_bucket(tmp_path):
         asyncio.run(src.snapshot(snap))
         store["data.csv"] = b"mutated bytes\n"
 
-        dst = Workspace.load(snap, resources={"/s3": S3Resource(_config())})
+        dst = _load(snap, resources={"/s3": S3Resource(_config())})
         # Cache holds snapshot bytes; clear so we hit S3 and exercise the
         # pin path, not the cache path.
         _drop_path_from_cache(dst, "/s3/data.csv")
@@ -198,7 +202,7 @@ def test_live_only_mount_does_not_block_snapshot(tmp_path, caplog):
     asyncio.run(src.snapshot(snap))
 
     with caplog.at_level("WARNING"):
-        Workspace.load(snap)
+        _load(snap)
     assert any("live-only" in r.message.lower()
                or "live-only" in r.getMessage().lower()
                for r in caplog.records) or any(

@@ -196,10 +196,10 @@ describe('Workspace.unmount', () => {
     await ws.close()
   })
 
-  it('throws on cache root, observer prefix, /dev/, and unknown prefix', async () => {
+  it('throws on cache root, history view, /dev/, and unknown prefix', async () => {
     const ws = new Workspace({ '/data': new RAMResource() })
     await expect(ws.unmount('/')).rejects.toThrow(/cache root/i)
-    await expect(ws.unmount('/.sessions')).rejects.toThrow(/observer prefix/i)
+    await expect(ws.unmount('/.bash_history')).rejects.toThrow(/history view/i)
     await expect(ws.unmount('/dev')).rejects.toThrow(/reserved/i)
     await expect(ws.unmount('/missing')).rejects.toThrow(/no mount/i)
     await ws.close()
@@ -225,12 +225,12 @@ describe('Workspace mount fallback', () => {
     await ws.close()
   })
 
-  it('skips the observer mount even when no default cache provides the command', async () => {
+  it('skips the history view mount even when no default cache provides the command', async () => {
     const ws = new Workspace({ '/r': new RAMResource() }, { mode: MountMode.READ })
     // The default cache is RAM-backed and writable, so it will satisfy `mkdir`.
-    // The point: even with a read-only observer in the registry, fallback is /_default/, never /.sessions/.
+    // The point: even with the read-only history view in the registry, fallback is /_default/, never /.bash_history/.
     const m = ws.registry.mountForCommand('mkdir')
-    expect(m?.prefix).not.toBe('/.sessions/')
+    expect(m?.prefix).not.toBe('/.bash_history/')
     await ws.close()
   })
 })
@@ -295,12 +295,12 @@ describe('ls injects child mounts as virtual subdirectories', () => {
     await ws.close()
   })
 
-  it('ls / hides .sessions by default and shows it under -a', async () => {
+  it('ls / hides .bash_history by default and shows it under -a', async () => {
     const ws = await makeWs({ '/': new RAMResource() })
     const plain = await ws.execute('ls /')
-    expect(plain.stdoutText.split('\n')).not.toContain('.sessions')
+    expect(plain.stdoutText.split('\n')).not.toContain('.bash_history')
     const all = await ws.execute('ls -a /')
-    expect(all.stdoutText.split('\n')).toContain('.sessions')
+    expect(all.stdoutText.split('\n')).toContain('.bash_history')
     await ws.close()
   })
 

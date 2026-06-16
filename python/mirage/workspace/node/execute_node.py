@@ -59,7 +59,6 @@ async def execute_node(
     session: Session,
     stdin: Any = None,
     call_stack: CallStack | None = None,
-    history: object = None,
     cancel: asyncio.Event | None = None,
 ) -> tuple[Any, IOResult, ExecutionNode]:
     """Walk tree-sitter AST and dispatch each node.
@@ -74,7 +73,6 @@ async def execute_node(
         session (Session): shell session state.
         stdin (Any): input stream.
         call_stack (CallStack): shell call stack.
-        history (object): execution history sink.
         cancel (asyncio.Event | None): event used to abort mid-flight.
     """
     if cancel is not None and cancel.is_set():
@@ -87,7 +85,6 @@ async def execute_node(
                       job_table,
                       execute_fn,
                       agent_id,
-                      history=history,
                       cancel=cancel)
 
     ntype = node.type
@@ -111,7 +108,6 @@ async def execute_node(
                                      stdin,
                                      cs,
                                      job_table,
-                                     history=history,
                                      cancel=cancel)
 
     # ── pipeline ────────────────────────────────

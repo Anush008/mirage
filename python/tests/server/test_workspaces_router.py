@@ -35,9 +35,11 @@ def _minimal_config() -> dict:
     }
 
 
-def _make_app_with_short_grace(grace: float = 0.2):
+def _make_app_with_short_grace(grace: float = 0.2, snapshot_root=None):
     exit_event = asyncio.Event()
-    app = build_app(idle_grace_seconds=grace, exit_event=exit_event)
+    app = build_app(idle_grace_seconds=grace,
+                    exit_event=exit_event,
+                    snapshot_root=snapshot_root)
     return app, exit_event
 
 
@@ -164,7 +166,7 @@ async def test_health_endpoint():
 
 @pytest.mark.asyncio
 async def test_snapshot_writes_tar_to_path(tmp_path):
-    app, _ = _make_app_with_short_grace(grace=10.0)
+    app, _ = _make_app_with_short_grace(grace=10.0, snapshot_root=tmp_path)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport,
                            base_url="http://test") as client:
@@ -183,7 +185,7 @@ async def test_snapshot_writes_tar_to_path(tmp_path):
 
 @pytest.mark.asyncio
 async def test_snapshot_load_round_trip(tmp_path):
-    app, _ = _make_app_with_short_grace(grace=10.0)
+    app, _ = _make_app_with_short_grace(grace=10.0, snapshot_root=tmp_path)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport,
                            base_url="http://test") as client:
@@ -205,8 +207,22 @@ async def test_snapshot_load_round_trip(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_snapshot_rejects_path_outside_root(tmp_path):
+    app, _ = _make_app_with_short_grace(grace=10.0, snapshot_root=tmp_path)
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport,
+                           base_url="http://test") as client:
+        r = await client.post("/v1/workspaces", json=_minimal_config())
+        wid = r.json()["id"]
+        r = await client.post(f"/v1/workspaces/{wid}/snapshot",
+                              json={"path": "../escape.tar"})
+        assert r.status_code == 400, r.text
+        assert not (tmp_path.parent / "escape.tar").exists()
+
+
+@pytest.mark.asyncio
 async def test_load_missing_path_returns_400(tmp_path):
-    app, _ = _make_app_with_short_grace(grace=10.0)
+    app, _ = _make_app_with_short_grace(grace=10.0, snapshot_root=tmp_path)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport,
                            base_url="http://test") as client:

@@ -47,10 +47,7 @@ def _ram_ws():
     p._store.files["/data.csv"] = b"name,age\nalice,30\nbob,25\n"
     p._store.dirs.add("/sub")
     p._store.files["/sub/nested.txt"] = b"nested content\n"
-    ws = Workspace(
-        resources={"/ram/": (p, MountMode.WRITE)},
-        history=None,
-    )
+    ws = Workspace(resources={"/ram/": (p, MountMode.WRITE)}, )
     ws.get_session(DEFAULT_SESSION_ID).cwd = "/ram"
     return ws
 
@@ -132,10 +129,7 @@ def disk_ws(tmp_path):
     (sub / "nested.txt").write_bytes(b"nested\n")
 
     p = DiskResource(root=str(data_dir))
-    ws = Workspace(
-        resources={"/disk/": (p, MountMode.WRITE)},
-        history=None,
-    )
+    ws = Workspace(resources={"/disk/": (p, MountMode.WRITE)}, )
     ws.get_session(DEFAULT_SESSION_ID).cwd = "/disk"
     return ws
 
@@ -215,13 +209,10 @@ def multi_ws(tmp_path):
 
     disk = DiskResource(root=str(data_dir))
 
-    ws = Workspace(
-        resources={
-            "/ram/": (ram, MountMode.WRITE),
-            "/disk/": (disk, MountMode.WRITE),
-        },
-        history=None,
-    )
+    ws = Workspace(resources={
+        "/ram/": (ram, MountMode.WRITE),
+        "/disk/": (disk, MountMode.WRITE),
+    }, )
     ws.get_session(DEFAULT_SESSION_ID).cwd = "/ram"
     return ws
 

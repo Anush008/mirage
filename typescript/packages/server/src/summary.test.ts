@@ -28,11 +28,11 @@ describe('summary', () => {
     expect(brief.mountCount).toBe(1)
   })
 
-  it('makeDetail emits mounts + sessions', () => {
+  it('makeDetail emits mounts + sessions', async () => {
     const r = new WorkspaceRegistry()
     const ws = new Workspace({ '/data/': new RAMResource() }, { mode: MountMode.WRITE })
     const entry = r.add(ws, 'ws-y')
-    const detail = makeDetail(entry)
+    const detail = await makeDetail(entry)
     expect(detail.mounts).toHaveLength(1)
     expect(detail.mounts[0]?.prefix).toBe('/data/')
     expect(detail.mounts[0]?.resource).toBe('ram')

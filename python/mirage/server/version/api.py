@@ -23,7 +23,7 @@ from mirage.workspace.snapshot import (apply_state_dict, install_fingerprints,
 
 
 async def snapshot_tree(store: VersionStore, ws) -> bytes:
-    return await snapshot_tree_from_state(store, to_state_dict(ws))
+    return await snapshot_tree_from_state(store, await to_state_dict(ws))
 
 
 async def snapshot_tree_from_state(store: VersionStore, state: dict) -> bytes:
@@ -39,7 +39,7 @@ async def commit(store: VersionStore,
                  ws,
                  branch: str = "main",
                  message: str = "") -> bytes:
-    return await commit_state(store, to_state_dict(ws), branch, message)
+    return await commit_state(store, await to_state_dict(ws), branch, message)
 
 
 async def commit_state(store: VersionStore,
@@ -94,7 +94,7 @@ async def checkout(store: VersionStore,
     entries, meta = await read_version(store, version)
     state = to_state(entries, meta)
     await ws._cache.clear()
-    apply_state_dict(ws, state)
+    await apply_state_dict(ws, state)
     install_fingerprints(ws,
                          state.get(StateKey.FINGERPRINTS) or [], drift_policy)
 
@@ -138,7 +138,7 @@ async def diff_live_vs_ref(store: VersionStore, state: dict,
 async def status(store: VersionStore,
                  ws,
                  branch: str = "main") -> dict[str, list[str]]:
-    return await status_state(store, to_state_dict(ws), branch)
+    return await status_state(store, await to_state_dict(ws), branch)
 
 
 async def status_state(store: VersionStore,

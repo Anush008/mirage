@@ -15,17 +15,22 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DiskResource, MountMode, Workspace } from '@struktoai/mirage-node'
+import { DiskObserverStore, DiskResource, MountMode, Workspace } from '@struktoai/mirage-node'
 import { runCases } from './cases.ts'
 
 async function main(): Promise<void> {
   const root = mkdtempSync(join(tmpdir(), 'mirage-integ-disk-'))
-  const ws = new Workspace({ '/data': new DiskResource({ root }) }, { mode: MountMode.WRITE })
+  const obsRoot = mkdtempSync(join(tmpdir(), 'mirage-integ-observer-'))
+  const ws = new Workspace(
+    { '/data': new DiskResource({ root }) },
+    { mode: MountMode.WRITE, observe: new DiskObserverStore(obsRoot) },
+  )
   try {
     await runCases(ws)
   } finally {
     await ws.close()
     rmSync(root, { recursive: true, force: true })
+    rmSync(obsRoot, { recursive: true, force: true })
   }
 }
 

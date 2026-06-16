@@ -45,7 +45,6 @@ def test_load_full_yaml_with_env_interpolation():
     cfg = load_config(FIXTURES / "full.yaml", env=env)
     assert cfg.mode == MountMode.WRITE
     assert cfg.consistency == ConsistencyPolicy.LAZY
-    assert cfg.history == 50
     assert isinstance(cfg.cache, RamCacheBlock)
     assert cfg.cache.limit == "256MB"
     assert cfg.mounts["/s3"].config["bucket"] == "my-test-bucket"
@@ -198,7 +197,7 @@ def test_merge_override_adds_new_mount():
 
 def test_merge_override_preserves_unrelated_fields():
     base = load_config({
-        "history": 25,
+        "default_session_id": "keepme",
         "mounts": {
             "/": {
                 "resource": "ram"
@@ -206,7 +205,7 @@ def test_merge_override_preserves_unrelated_fields():
         },
     })
     merged = merge_override(base, {"mounts": {"/disk": {"resource": "disk"}}})
-    assert merged.history == 25
+    assert merged.default_session_id == "keepme"
 
 
 def test_round_trip_dict_source_matches_yaml(tmp_path):

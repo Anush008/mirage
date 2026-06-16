@@ -31,6 +31,7 @@
  *  4. Open http://localhost:5173/dropbox_pkce.html
  */
 import { DropboxResource, MountMode, Workspace } from '@struktoai/mirage-browser'
+import { escapeHtml } from './html.ts'
 
 declare const __DROPBOX_CLIENT_ID__: string
 
@@ -190,7 +191,7 @@ async function main(): Promise<void> {
   const errParam = url.searchParams.get('error')
 
   if (errParam !== null) {
-    setStatus(`<span class="err">Dropbox declined the consent: ${errParam}</span>`)
+    setStatus(`<span class="err">Dropbox declined the consent: ${escapeHtml(errParam)}</span>`)
     return
   }
 
@@ -201,7 +202,9 @@ async function main(): Promise<void> {
       writeTokens(tokens)
       window.history.replaceState({}, document.title, '/dropbox_pkce.html')
     } catch (err) {
-      setStatus(`<span class="err">${err instanceof Error ? err.message : String(err)}</span>`)
+      setStatus(
+        `<span class="err">${escapeHtml(err instanceof Error ? err.message : String(err))}</span>`,
+      )
       return
     }
   }

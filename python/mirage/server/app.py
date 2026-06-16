@@ -81,7 +81,8 @@ def build_app(idle_grace_seconds: float = 30.0,
               exit_event: asyncio.Event | None = None,
               allowed_hosts: list[str] | None = None,
               auth_config: AuthConfig | None = None,
-              version_root: str | Path | None = None) -> FastAPI:
+              version_root: str | Path | None = None,
+              snapshot_root: str | Path | None = None) -> FastAPI:
     """Construct a daemon FastAPI app.
 
     The workspace registry is created eagerly so the app is usable
@@ -130,6 +131,8 @@ def build_app(idle_grace_seconds: float = 30.0,
     vroot = (Path(version_root) if version_root is not None else Path.home() /
              ".mirage" / "repos")
     app.state.version_backend = LocalBackend(vroot)
+    app.state.snapshot_root = (Path(snapshot_root) if snapshot_root is not None
+                               else Path.home() / ".mirage" / "snapshots")
     app.include_router(workspaces.router)
     app.include_router(versions.router)
     app.include_router(sessions.router)

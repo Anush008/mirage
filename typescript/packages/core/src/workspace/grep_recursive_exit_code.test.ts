@@ -22,7 +22,7 @@ import { Workspace } from './workspace.ts'
 // Regression coverage for GitHub issue #43:
 // `grep -rEn pattern .` and `grep -rEn pattern /` returned exitCode=1 even
 // when matches were present in stdout, because the fan-out across descendant
-// mounts (e.g. /.sessions, /dev) wrote the aggregated 0 onto mergedIo but
+// mounts (e.g. /.bash_history, /dev) wrote the aggregated 0 onto mergedIo but
 // left streamSource pointing at a failing sub-IO, and a later syncExitCode()
 // clobbered the 0 back to 1.
 

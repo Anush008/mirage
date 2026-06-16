@@ -26,10 +26,7 @@ def _run(coro):
 def _ws():
     ram = RAMResource()
     ram._store.files["/hello.txt"] = b"hi\n"
-    return Workspace(
-        resources={"/ram/": (ram, MountMode.EXEC)},
-        history=None,
-    )
+    return Workspace(resources={"/ram/": (ram, MountMode.EXEC)}, )
 
 
 def _exec(ws, cmd):

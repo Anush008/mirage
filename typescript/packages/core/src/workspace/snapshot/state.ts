@@ -15,19 +15,19 @@
 import { CacheEntry } from '../../cache/file/entry.ts'
 import { RAMFileCacheStore } from '../../cache/file/ram.ts'
 import type { Resource } from '../../resource/base.ts'
+import { EVENT_CLEAR, EVENT_COMMAND, EVENT_DELETE } from '../../observe/log_entry.ts'
+import type { EventDict } from '../../observe/observer.ts'
 import { RAMResource, type RAMResourceState } from '../../resource/ram/ram.ts'
+import { HISTORY_PREFIX } from '../../resource/history/history.ts'
 import { resourceStateRequiresOverride } from '../../resource/secrets.ts'
 import { Job, JobStatus } from '../../shell/job_table.ts'
 import { ConsistencyPolicy, MountMode } from '../../types.ts'
-import { ExecutionNode, ExecutionRecord } from '../types.ts'
 import { VERSION } from '../../version.ts'
 import type { Workspace } from '../workspace.ts'
 import type { MountArgs } from './config.ts'
 import { captureFingerprints, liveOnlyMountPrefixes } from './drift.ts'
 import type {
   CacheEntrySnapshot,
-  ExecutionNodeSnapshot,
-  ExecutionRecordSnapshot,
   FingerprintEntrySnapshot,
   JobSnapshot,
   MountSnapshot,
@@ -39,55 +39,8 @@ import { FORMAT_VERSION, normMountPrefix } from './utils.ts'
 
 const VALID_MODES: readonly string[] = [MountMode.READ, MountMode.WRITE, MountMode.EXEC]
 
-function nodeToSnapshot(n: ExecutionNode): ExecutionNodeSnapshot {
-  return {
-    command: n.command,
-    op: n.op,
-    stderr: n.stderr,
-    exit_code: n.exitCode,
-    children: n.children.map((c) => nodeToSnapshot(c)),
-  }
-}
-
-function nodeFromSnapshot(s: ExecutionNodeSnapshot): ExecutionNode {
-  return new ExecutionNode({
-    command: s.command,
-    op: s.op,
-    stderr: s.stderr,
-    exitCode: s.exit_code,
-    children: s.children.map((c) => nodeFromSnapshot(c)),
-  })
-}
-
-function recordToSnapshot(r: ExecutionRecord): ExecutionRecordSnapshot {
-  return {
-    agent: r.agent,
-    command: r.command,
-    stdout: r.stdout,
-    stdin: r.stdin,
-    exit_code: r.exitCode,
-    tree: nodeToSnapshot(r.tree),
-    timestamp: r.timestamp,
-    session_id: r.sessionId,
-  }
-}
-
-function recordFromSnapshot(s: ExecutionRecordSnapshot): ExecutionRecord {
-  return new ExecutionRecord({
-    agent: s.agent,
-    command: s.command,
-    stdout: s.stdout,
-    stdin: s.stdin,
-    exitCode: s.exit_code,
-    tree: nodeFromSnapshot(s.tree),
-    timestamp: s.timestamp,
-    sessionId: s.session_id,
-  })
-}
-
 export async function toStateDict(ws: Workspace): Promise<WorkspaceStateDict> {
-  const observerPrefix = normMountPrefix(ws.observer.prefix)
-  const skip = new Set([observerPrefix, '/.sessions/', '/dev/'])
+  const skip = new Set(['/dev/', normMountPrefix(HISTORY_PREFIX)])
   const mounts = [...ws.registry.allMounts()].filter((m) => !skip.has(m.prefix))
   const mountSnapshots: MountSnapshot[] = []
   for (let i = 0; i < mounts.length; i++) {
@@ -139,7 +92,9 @@ export async function toStateDict(ws: Workspace): Promise<WorkspaceStateDict> {
       agent: j.agent,
       session_id: j.sessionId,
     }))
-  const historyRecords = ws.history.entries().map((r) => recordToSnapshot(r))
+  const historyEvents = (await ws.observer.events()).filter(
+    (e) => e.type === EVENT_COMMAND || e.type === EVENT_CLEAR || e.type === EVENT_DELETE,
+  )
   const fingerprints: FingerprintEntrySnapshot[] = captureFingerprints(ws.records, ws.registry)
   const liveOnly = liveOnlyMountPrefixes(ws.registry)
   return {
@@ -155,7 +110,7 @@ export async function toStateDict(ws: Workspace): Promise<WorkspaceStateDict> {
       max_drain_bytes: ramCache !== null ? ramCache.maxDrainBytes : null,
       entries: cacheEntries,
     },
-    history: historyRecords,
+    history: historyEvents,
     jobs,
     fingerprints,
     live_only_mounts: liveOnly,
@@ -245,10 +200,11 @@ function restoreCache(ws: Workspace, state: WorkspaceStateDict): void {
 }
 
 async function restoreHistory(ws: Workspace, state: WorkspaceStateDict): Promise<void> {
-  ws.history.clear()
-  for (const r of state.history) {
-    await ws.history.append(recordFromSnapshot(r))
-  }
+  // Always load (loadEvents clears first): a snapshot with empty history
+  // still rewinds the recorder, same as the cache clear. Foreign-format
+  // entries (e.g. a Python snapshot's different history shape) are skipped
+  // inside loadEvents.
+  await ws.observer.loadEvents((state.history as EventDict[] | undefined) ?? [])
 }
 
 function restoreJobs(ws: Workspace, state: WorkspaceStateDict): void {

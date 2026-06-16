@@ -16,6 +16,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import * as nodeFs from 'node:fs'
 import { join } from 'node:path'
 import git from 'isomorphic-git'
+import { resolveWithinRoot, validatePathSegment } from '../paths.ts'
 
 export type FsClient = Parameters<typeof git.init>[0]['fs']
 
@@ -32,7 +33,7 @@ export class LocalBackend implements VersionBackend {
   constructor(private readonly root: string) {}
 
   async openRepo(workspaceId: string): Promise<GitRepo> {
-    const gitdir = join(this.root, workspaceId)
+    const gitdir = resolveWithinRoot(this.root, validatePathSegment(workspaceId))
     const fs = nodeFs as unknown as FsClient
     if (!existsSync(join(gitdir, 'objects'))) {
       mkdirSync(gitdir, { recursive: true })

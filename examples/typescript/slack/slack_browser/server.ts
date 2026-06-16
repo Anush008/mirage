@@ -27,6 +27,7 @@ if (TOKEN === undefined || TOKEN === '') {
 const PREFIX = '/api/slack/'
 const HOST = '127.0.0.1'
 const PORT = 8901
+const UPSTREAM_ORIGIN = 'https://slack.com'
 
 async function readBody(req: IncomingMessage): Promise<Buffer> {
   const chunks: Buffer[] = []
@@ -45,8 +46,14 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     return
   }
   const endpoint = url.pathname.slice(PREFIX.length)
-  const upstream = new URL(`https://slack.com/api/${endpoint}`)
+  const upstream = new URL(`${UPSTREAM_ORIGIN}/api/${endpoint}`)
   upstream.search = url.search
+  if (upstream.origin !== UPSTREAM_ORIGIN) {
+    res.statusCode = 400
+    res.setHeader('content-type', 'application/json')
+    res.end(JSON.stringify({ error: 'upstream host not allowed' }))
+    return
+  }
 
   const method = (req.method ?? 'GET').toUpperCase()
   const headers: Record<string, string> = {
@@ -75,9 +82,10 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     if (upstreamCt !== null) res.setHeader('content-type', upstreamCt)
     res.end(text)
   } catch (err) {
+    console.error('upstream fetch error:', err)
     res.statusCode = 502
     res.setHeader('content-type', 'application/json')
-    res.end(JSON.stringify({ error: 'upstream error', message: String(err) }))
+    res.end(JSON.stringify({ error: 'upstream error' }))
   }
 }
 

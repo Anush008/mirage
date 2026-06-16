@@ -15,7 +15,9 @@ fail=0
 
 export CROSS_DISK_ROOT="${CROSS_DISK_ROOT:-/tmp/mirage-cross-disk}"
 export CROSS_REDIS_PREFIX="${CROSS_REDIS_PREFIX:-mirage-cross/}"
-mkdir -p "$CROSS_DISK_ROOT"
+export CROSS_SNAPSHOT_ROOT="${CROSS_SNAPSHOT_ROOT:-/tmp/mirage-cross-snap}"
+export MIRAGE_SNAPSHOT_ROOT="$CROSS_SNAPSHOT_ROOT"
+mkdir -p "$CROSS_DISK_ROOT" "$CROSS_SNAPSHOT_ROOT"
 
 FINGERPRINTS=(
   "cat /ram/f.txt"
@@ -23,6 +25,7 @@ FINGERPRINTS=(
   "cat /redis/h.txt"
   "cat /minio/data/x.txt"
   "cat /ram/f.txt /disk/g.txt | wc -l"
+  "grep -v '^#' /.bash_history | head -n 1"
 )
 
 freeport() { lsof -ti:8765 2>/dev/null | xargs kill -9 2>/dev/null; sleep 1; }
@@ -30,11 +33,13 @@ stdout_of() { jq -r '.stdout // .result.stdout // empty'; }
 
 seed() {
   local cli="$1" id="$2"
+  $cli execute -w "$id" -c "echo cross-history-marker" >/dev/null
   $cli execute -w "$id" -c "printf 'ram-a\nram-b\n' > /ram/f.txt" >/dev/null
   $cli execute -w "$id" -c "printf 'disk-1\ndisk-2\ndisk-3\n' > /disk/g.txt" >/dev/null
   $cli execute -w "$id" -c "printf 'redis-x\nredis-y\n' > /redis/h.txt" >/dev/null
   $cli execute -w "$id" -c "printf 'minio-1\nminio-2\n' > /minio/data/x.txt" >/dev/null
   $cli execute -w "$id" -c "printf '1\n2\n3\n4\n5\n' > /guard/big.txt" >/dev/null
+  $cli execute -w "$id" -c "echo cross-history-marker" >/dev/null
 }
 
 # The /guard mount in cross.yaml caps `cat` at 2 lines. Safeguards apply at
@@ -69,7 +74,7 @@ check_default_session() {
 
 run_direction() {
   local writer_cli="$1" writer_name="$2" reader_cli="$3" reader_name="$4"
-  local tar="/tmp/cross-${writer_name}-to-${reader_name}.tar"
+  local tar="$CROSS_SNAPSHOT_ROOT/cross-${writer_name}-to-${reader_name}.tar"
   echo
   echo "===== $writer_name snapshot -> $reader_name load ====="
 

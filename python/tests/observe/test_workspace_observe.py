@@ -16,39 +16,32 @@ import asyncio
 import json
 
 from mirage import MountMode, Workspace
+from mirage.observe.store import RAMObserverStore
 from mirage.resource.ram import RAMResource
-from mirage.utils.dates import utc_date_folder
 
 
 def test_workspace_creates_default_observer():
     ws = Workspace({"/data/": RAMResource()}, mode=MountMode.WRITE)
     assert ws.observer is not None
-    assert ws.observer.prefix == "/.sessions"
+    assert isinstance(ws.observer.store, RAMObserverStore)
 
 
-def test_workspace_custom_observe_resource():
-    obs_resource = RAMResource()
+def test_workspace_custom_observe_store():
+    obs_store = RAMObserverStore()
     ws = Workspace(
         {"/data/": RAMResource()},
         mode=MountMode.WRITE,
-        observe=obs_resource,
+        observe=obs_store,
     )
-    assert ws.observer.resource is obs_resource
-
-
-def test_workspace_custom_observe_prefix():
-    ws = Workspace(
-        {"/data/": RAMResource()},
-        mode=MountMode.WRITE,
-        observe_prefix="/audit",
-    )
-    assert ws.observer.prefix == "/audit"
+    assert ws.observer.store is obs_store
 
 
 def test_logs_populated_after_execute():
-    ws = Workspace({"/data/": RAMResource()}, mode=MountMode.WRITE)
+    obs_store = RAMObserverStore()
+    ws = Workspace({"/data/": RAMResource()},
+                   mode=MountMode.WRITE,
+                   observe=obs_store)
     asyncio.run(ws.execute("echo hello > /data/test.txt"))
-    obs_store = ws.observer.resource._store
     session_files = [k for k in obs_store.files if k.endswith(".jsonl")]
     assert len(session_files) >= 1
     data = obs_store.files[session_files[0]]
@@ -59,10 +52,12 @@ def test_logs_populated_after_execute():
 
 
 def test_logs_contain_op_records():
-    ws = Workspace({"/data/": RAMResource()}, mode=MountMode.WRITE)
+    obs_store = RAMObserverStore()
+    ws = Workspace({"/data/": RAMResource()},
+                   mode=MountMode.WRITE,
+                   observe=obs_store)
     asyncio.run(ws.execute("echo hello > /data/test.txt"))
     asyncio.run(ws.execute("cat /data/test.txt"))
-    obs_store = ws.observer.resource._store
     session_files = [k for k in obs_store.files if k.endswith(".jsonl")]
     data = obs_store.files[session_files[0]]
     lines = data.decode().strip().split("\n")
@@ -71,22 +66,10 @@ def test_logs_contain_op_records():
     assert "command" in types
 
 
-def test_logs_mount_readable_via_execute():
+def test_observer_store_not_mounted():
     ws = Workspace({"/data/": RAMResource()}, mode=MountMode.WRITE)
     asyncio.run(ws.execute("echo hi > /data/f.txt"))
-
-    async def _run():
-        day_res = await ws.execute("ls /.sessions")
-        assert day_res.exit_code == 0
-        assert utc_date_folder() in await day_res.stdout_str()
-        result = await ws.execute(f"ls /.sessions/{utc_date_folder()}")
-        assert result.exit_code == 0
-        assert ".jsonl" in await result.stdout_str()
-
-    asyncio.run(_run())
-
-
-def test_logs_mount_read_only():
-    ws = Workspace({"/data/": RAMResource()}, mode=MountMode.WRITE)
-    result = asyncio.run(ws.execute("echo test > /.sessions/hack.txt"))
+    result = asyncio.run(ws.execute("ls /.sessions"))
     assert result.exit_code != 0
+    prefixes = {m.prefix for m in ws._registry.mounts()}
+    assert prefixes == {"/data/", "/dev/", "/.bash_history/"}

@@ -34,6 +34,7 @@
  * NO `client_secret` parameter (PKCE works as expected end-to-end).
  */
 import { GDocsResource, MountMode, Workspace } from '@struktoai/mirage-browser'
+import { escapeHtml } from './html.ts'
 
 declare const __GOOGLE_CLIENT_ID__: string
 
@@ -222,7 +223,7 @@ async function main(): Promise<void> {
   const errParam = url.searchParams.get('error')
 
   if (errParam !== null) {
-    status(`<span class="err">Google declined the consent: ${errParam}</span>`)
+    status(`<span class="err">Google declined the consent: ${escapeHtml(errParam)}</span>`)
     return
   }
 
@@ -234,7 +235,9 @@ async function main(): Promise<void> {
       // Strip ?code= from the URL so a reload doesn't try to re-exchange.
       window.history.replaceState({}, document.title, '/gdocs_pkce.html')
     } catch (err) {
-      status(`<span class="err">${err instanceof Error ? err.message : String(err)}</span>`)
+      status(
+        `<span class="err">${escapeHtml(err instanceof Error ? err.message : String(err))}</span>`,
+      )
       return
     }
   }

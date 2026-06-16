@@ -148,10 +148,10 @@ describe('liveOnlyMountPrefixes', () => {
     expect(liveOnlyMountPrefixes(registry)).toEqual(['/gmail/'])
   })
 
-  it('excludes infrastructure prefixes /dev/ and /.sessions/', () => {
+  it('excludes infrastructure prefixes /dev/ and /.bash_history/', () => {
     const dev = makeMount('/dev/', false)
-    const sessions = makeMount('/.sessions/', false)
-    const registry = makeRegistry([dev, sessions])
+    const history = makeMount('/.bash_history/', false)
+    const registry = makeRegistry([dev, history])
     expect(liveOnlyMountPrefixes(registry)).toEqual([])
   })
 })

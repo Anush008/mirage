@@ -34,7 +34,7 @@ jobs:
       ssh: ${{ steps.filter.outputs.ssh }}
       fuse: ${{ steps.filter.outputs.fuse }}
     steps:
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -157,6 +157,11 @@ jobs:
         run: |
           ./python/.venv/bin/python integ/safeguard.py > /tmp/safeguard.out
           diff integ/truth_safeguard.txt /tmp/safeguard.out
+
+      - name: Run History scenarios and diff against truth
+        run: |
+          ./python/.venv/bin/python integ/history.py > /tmp/history.out
+          diff integ/truth_history.txt /tmp/history.out
 
       - name: Run s3 + gcs + minio integ (moto) and diff against truth
         run: |
@@ -434,7 +439,7 @@ jobs:
           node-version: '24'
 
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           version: 10.32.1
 

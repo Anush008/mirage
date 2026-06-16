@@ -39,19 +39,6 @@ def ops_summary() -> str:
     return f"{len(records)} ops, {total} bytes transferred"
 
 
-def print_tree(node, indent=4):
-    prefix = " " * indent
-    if node.command:
-        stderr_str = node.stderr.decode(errors="replace").strip()
-        print(f"{prefix}{node.command}  "
-              f"exit={node.exit_code}"
-              f"{f'  stderr={stderr_str!r}' if stderr_str else ''}")
-    else:
-        print(f"{prefix}({node.op})  exit={node.exit_code}")
-    for child in node.children:
-        print_tree(child, indent + 2)
-
-
 async def main():
     # ── prime the cache: gdrive resolves paths via file IDs ──
     await ws.execute("ls /gdrive/")
@@ -394,63 +381,29 @@ async def main():
     dr = await ws.execute("grep mirage example.jsonl", provision=True)
     print(f"  network_read: {dr.network_read}, cache_read: {dr.cache_read}")
 
-    # ── execution history: structured observability ──
+    # ── execution history: hidden recorder + GNU views ──
     print("\n=== EXECUTION HISTORY ===\n")
-    print(f"  Total commands recorded: {len(ws.history.entries())}")
+    events = await ws.history()
+    print(f"  Total commands recorded: {len(events)}")
 
-    entry = ws.history.entries()[-1]
-    print(f"\n  Last command: {entry.command}")
-    print(f"  Agent: {entry.agent}")
-    print(f"  Exit code: {entry.exit_code}")
+    entry = events[-1]
+    print(f"\n  Last command: {entry['command']}")
+    print(f"  Agent: {entry['agent']}")
+    print(f"  Exit code: {entry['exit_code']}")
 
-    print("\n  --- pipe tree: grep | grep -v | head | cut ---")
-    await ws.execute(
-        "grep queue-operation /gdrive/mirage/example.jsonl"
-        " | grep -v error | head -n 2 | cut -d , -f 1",
-        agent_id="demo-agent",
-    )
-    pipe_entry = ws.history.entries()[-1]
-    print_tree(pipe_entry.tree)
+    print("\n  --- history (shell builtin, this session) ---")
+    r = await ws.execute("history 5")
+    for line in (await r.stdout_str()).splitlines():
+        print(f"  {line[:100]}")
 
-    print("\n  --- error attribution: grep NONEXISTENT | sort | head ---")
-    await ws.execute(
-        "grep NONEXISTENT /gdrive/mirage/example.jsonl | sort | head -n 5",
-        agent_id="demo-agent",
-    )
-    err_entry = ws.history.entries()[-1]
-    print_tree(err_entry.tree)
-    print(f"    Top-level exit: {err_entry.exit_code}")
-    for child in err_entry.tree.children:
-        if child.exit_code != 0:
-            print(
-                f"    ^ failed stage: {child.command} (exit={child.exit_code})"
-            )
-
-    print("\n  --- control flow tree: grep && echo ; wc -l ---")
-    await ws.execute(
-        "grep -m 1 mirage /gdrive/mirage/example.jsonl && echo found"
-        " ; wc -l /gdrive/mirage/example.jsonl",
-        agent_id="demo-agent",
-    )
-    cf_entry = ws.history.entries()[-1]
-    print_tree(cf_entry.tree)
-
-    print("\n  --- full history (all commands) ---")
-    for i, e in enumerate(ws.history.entries()):
-        print(f"  [{i}] {e.command[:70]}")
-        print(f"      agent={e.agent}  exit={e.exit_code}  "
-              f"stdout={len(e.stdout)}B")
-        if e.tree.children:
-            for child in e.tree.children:
-                stderr_str = child.stderr.decode(errors="replace").strip()
-                label = child.command or f"({child.op})"
-                print(
-                    f"        {label}  exit={child.exit_code}"
-                    f"{'  stderr=' + repr(stderr_str) if stderr_str else ''}")
+    print("\n  --- tail -n 6 /.bash_history (all sessions, GNU file) ---")
+    r = await ws.execute("tail -n 6 /.bash_history")
+    for line in (await r.stdout_str()).splitlines():
+        print(f"  {line[:100]}")
 
     print("\n  --- history as JSONL ---")
-    for e in ws.history.entries():
-        print(json.dumps(e.to_dict(), separators=(",", ":")))
+    for e in events[-3:]:
+        print(json.dumps(e, separators=(",", ":")))
 
     # ── background jobs: & operator ──
     print("\n=== BACKGROUND JOBS ===\n")
@@ -511,24 +464,22 @@ async def main():
 
     print("\n--- background job history ---")
     bg_entries = [
-        e for e in ws.history.entries()
-        if "grep" in e.command and "&" not in e.command
+        e for e in await ws.history()
+        if "grep" in e["command"] and "&" not in e["command"]
     ]
     print(f"  Background job records: {len(bg_entries)}")
     for e in bg_entries[-4:]:
-        print(f"    {e.command[:60]}  exit={e.exit_code}")
+        print(f"    {e['command'][:60]}  exit={e['exit_code']}")
 
-    # ── session observer: /.sessions mount ──
-    print("\n=== SESSION OBSERVER ===\n")
+    # ── bash history view ──
+    print("\n=== BASH HISTORY ===\n")
 
-    print("--- ls /.sessions ---")
-    result = await ws.execute("ls /.sessions")
+    print("--- ls -a / (dotfile view) ---")
+    result = await ws.execute("ls -a /")
     print(f"  {(await result.stdout_str()).strip()}")
 
-    from mirage.utils.dates import utc_date_folder
-    day = utc_date_folder()
-    print(f"\n--- cat /.sessions/{day}/*.jsonl | head -n 5 ---")
-    result = await ws.execute(f"head -n 5 /.sessions/{day}/*.jsonl")
+    print("\n--- grep grep /.bash_history | head -n 3 ---")
+    result = await ws.execute("grep grep /.bash_history | head -n 3")
     for line in (await result.stdout_str()).strip().splitlines():
         print(f"  {line[:120]}")
 

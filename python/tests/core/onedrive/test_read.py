@@ -5,8 +5,8 @@ from aioresponses import CallbackResult, aioresponses
 
 from mirage.accessor.onedrive import OneDriveAccessor, OneDriveConfig
 from mirage.core.onedrive.read import read_bytes
-from mirage.observe.context import (push_revisions, reset_revisions,
-                                    start_recording, stop_recording)
+from mirage.observe.context import (RecordingScope, push_revisions,
+                                    reset_revisions)
 from mirage.types import PathSpec
 
 
@@ -86,7 +86,8 @@ def _meta_payload():
 
 @pytest.mark.asyncio
 async def test_read_captures_fingerprint_and_revision_when_recording():
-    sink = start_recording()
+    scope = RecordingScope()
+    sink = scope.records
     try:
         with aioresponses() as m:
             m.get(_META, payload=_meta_payload())
@@ -94,7 +95,7 @@ async def test_read_captures_fingerprint_and_revision_when_recording():
             data = await read_bytes(_accessor(),
                                     PathSpec.from_str_path("/Docs/a.txt"))
     finally:
-        stop_recording()
+        scope.close()
     rec = sink[0]
     assert rec.fingerprint == "ctag-xyz"
     assert rec.revision == "2.0"
@@ -103,7 +104,8 @@ async def test_read_captures_fingerprint_and_revision_when_recording():
 
 @pytest.mark.asyncio
 async def test_capture_reads_pinned_download_url_not_live_content():
-    sink = start_recording()
+    scope = RecordingScope()
+    sink = scope.records
     try:
         with aioresponses() as m:
             m.get(_META, payload=_meta_payload())
@@ -112,7 +114,7 @@ async def test_capture_reads_pinned_download_url_not_live_content():
             data = await read_bytes(_accessor(),
                                     PathSpec.from_str_path("/Docs/a.txt"))
     finally:
-        stop_recording()
+        scope.close()
     assert data == b"snapshot bytes"
     assert sink[0].fingerprint == "ctag-xyz"
 

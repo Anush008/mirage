@@ -197,7 +197,9 @@ export {
 } from './io/stream.ts'
 export { OpRecord, type OpRecordInit } from './observe/record.ts'
 export { LogEntry, type LogEntryInit } from './observe/log_entry.ts'
-export { Observer } from './observe/observer.ts'
+export { type EventDict, Observer } from './observe/observer.ts'
+export { type ObserverStore, RAMObserverStore } from './observe/store.ts'
+export { HISTORY_PREFIX, HistoryViewResource } from './resource/history/history.ts'
 export {
   record,
   recordStream,
@@ -416,7 +418,6 @@ export {
   type RedisClientLike,
   type RedisIndexCacheOptions,
 } from './cache/index/redis.ts'
-export { ExecutionHistory, type ExecutionHistoryOptions } from './workspace/history.ts'
 export {
   ExecutionNode,
   type ExecutionNodeInit,

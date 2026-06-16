@@ -31,6 +31,7 @@
  * refresh. If you wipe localStorage you'll need to reconnect.
  */
 import { BoxResource, MountMode, Workspace } from '@struktoai/mirage-browser'
+import { escapeHtml } from './html.ts'
 
 declare const __BOX_CLIENT_ID__: string
 
@@ -189,7 +190,7 @@ async function main(): Promise<void> {
   const errParam = url.searchParams.get('error')
 
   if (errParam !== null) {
-    setStatus(`<span class="err">Box declined the consent: ${errParam}</span>`)
+    setStatus(`<span class="err">Box declined the consent: ${escapeHtml(errParam)}</span>`)
     return
   }
 
@@ -200,7 +201,9 @@ async function main(): Promise<void> {
       writeTokens(tokens)
       window.history.replaceState({}, document.title, '/box_pkce.html')
     } catch (err) {
-      setStatus(`<span class="err">${err instanceof Error ? err.message : String(err)}</span>`)
+      setStatus(
+        `<span class="err">${escapeHtml(err instanceof Error ? err.message : String(err))}</span>`,
+      )
       return
     }
   }

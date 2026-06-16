@@ -2,7 +2,6 @@ mode: WRITE
 consistency: LAZY
 default_session_id: default
 default_agent_id: default
-history: 50
 
 cache:
   type: ram

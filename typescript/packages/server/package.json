@@ -54,6 +54,7 @@
   },
   "dependencies": {
     "@fastify/multipart": "^10.0.0",
+    "@fastify/rate-limit": "^10.0.0",
     "@struktoai/mirage-core": "workspace:*",
     "@struktoai/mirage-node": "workspace:*",
     "fastify": "^5.8.5",

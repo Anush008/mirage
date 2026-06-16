@@ -13,22 +13,19 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 from mirage import Workspace
+from mirage.resource.history import HISTORY_PREFIX
 from mirage.server.registry import WorkspaceEntry
 from mirage.server.schemas import (MountSummary, SessionSummary,
                                    WorkspaceBrief, WorkspaceDetail,
                                    WorkspaceInternals)
 from mirage.workspace.snapshot.utils import norm_mount_prefix
 
-_AUTO_PREFIXES = {"/dev/"}
+_AUTO_PREFIXES = {"/dev/", norm_mount_prefix(HISTORY_PREFIX)}
 _DESCRIPTION_MAX = 120
 
 
-def _is_auto_prefix(prefix: str, observer_prefix: str | None) -> bool:
-    if prefix in _AUTO_PREFIXES:
-        return True
-    if observer_prefix and prefix == norm_mount_prefix(observer_prefix):
-        return True
-    return False
+def _is_auto_prefix(prefix: str) -> bool:
+    return prefix in _AUTO_PREFIXES
 
 
 def _mount_description(resource) -> str:
@@ -39,17 +36,13 @@ def _mount_description(resource) -> str:
 
 
 def _user_mounts(ws: Workspace):
-    observer_prefix = ws.observer.prefix if ws.observer is not None else None
-    return [
-        m for m in ws._registry.mounts()
-        if not _is_auto_prefix(m.prefix, observer_prefix)
-    ]
+    return [m for m in ws._registry.mounts() if not _is_auto_prefix(m.prefix)]
 
 
-def _build_internals(ws: Workspace) -> WorkspaceInternals:
+async def _build_internals(ws: Workspace) -> WorkspaceInternals:
     cache = ws._cache
     cache_bytes = sum(len(v) for v in cache._store.files.values())
-    history_len = (len(ws.history.entries()) if ws.history is not None else 0)
+    history_len = len(await ws.history())
     return WorkspaceInternals(
         cache_bytes=cache_bytes,
         cache_entries=len(cache._entries),
@@ -71,8 +64,8 @@ def make_brief(entry: WorkspaceEntry) -> WorkspaceBrief:
     )
 
 
-def make_detail(entry: WorkspaceEntry,
-                verbose: bool = False) -> WorkspaceDetail:
+async def make_detail(entry: WorkspaceEntry,
+                      verbose: bool = False) -> WorkspaceDetail:
     ws = entry.runner.ws
     user_mounts = _user_mounts(ws)
     workspace_mode = (user_mounts[0].mode.value if user_mounts else "read")
@@ -95,5 +88,5 @@ def make_detail(entry: WorkspaceEntry,
         fuse_mountpoints=ws.fuse_mountpoints,
         mounts=mounts,
         sessions=sessions,
-        internals=_build_internals(ws) if verbose else None,
+        internals=await _build_internals(ws) if verbose else None,
     )

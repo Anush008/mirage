@@ -173,6 +173,7 @@ export const ShellBuiltin = Object.freeze({
   PRINTENV: 'printenv',
   WHOAMI: 'whoami',
   MAN: 'man',
+  HISTORY: 'history',
   TRUE: 'true',
   FALSE: 'false',
   SOURCE: 'source',

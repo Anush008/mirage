@@ -453,6 +453,18 @@ export const CASES: ReadonlyArray<readonly [string, string]> = [
   ['root_create_mkdir', 'mkdir /data/rootdir && find /data/rootdir -type d'],
   ['root_create_basename', 'basename /data/at_root.txt'],
   ['root_create_dirname', 'dirname /data/at_root.txt'],
+  // ----- history: recorder views over whatever observer store -----
+  ['history_last_two', 'history 2'],
+  ['bash_history_tail', "grep -v '^#' /.bash_history | tail -n 3"],
+  ['history_find_view', 'find /.bash_history'],
+  ['history_find_no_dir', 'find /.bash_history -type d'],
+  ['bash_history_after_find', "grep -v '^#' /.bash_history | tail -n 1"],
+  // GNU bash histfile layout: a `#<epoch>` comment line per command.
+  // The timestamp is volatile, so normalize it to `#TS` to assert the
+  // structure deterministically. Uses the unanchored pattern because TS
+  // sed mishandles `^...$` anchors (strukto-ai/mirage#326); revert to
+  // `s/^#[0-9]*$/#TS/` once that is fixed.
+  ['bash_history_format', "cat /.bash_history | sed 's/#[0-9][0-9]*/#TS/' | tail -n 4"],
 ];
 
 export const EXIT_CODE_CASES: ReadonlyArray<readonly [string, string]> = [

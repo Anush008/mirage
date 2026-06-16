@@ -12,11 +12,18 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import type { ExecutionRecord } from '../workspace/types.ts'
 import type { OpRecord } from './record.ts'
 
+export const EVENT_OP = 'op'
+export const EVENT_COMMAND = 'command'
+export const EVENT_CLEAR = 'clear'
+export const EVENT_DELETE = 'delete'
+export const STDOUT_TRUNCATE = 4096
+
+export type EventType = 'op' | 'command' | 'clear' | 'delete'
+
 export interface LogEntryInit {
-  type: 'op' | 'command'
+  type: EventType
   agent: string
   session: string
   timestamp: number
@@ -29,10 +36,11 @@ export interface LogEntryInit {
   command?: string
   exitCode?: number
   stdout?: string
+  offset?: number
 }
 
 export class LogEntry {
-  readonly type: 'op' | 'command'
+  readonly type: EventType
   readonly agent: string
   readonly session: string
   readonly timestamp: number
@@ -45,6 +53,7 @@ export class LogEntry {
   readonly command: string | undefined
   readonly exitCode: number | undefined
   readonly stdout: string | undefined
+  readonly offset: number | undefined
 
   constructor(init: LogEntryInit) {
     this.type = init.type
@@ -60,11 +69,12 @@ export class LogEntry {
     this.command = init.command
     this.exitCode = init.exitCode
     this.stdout = init.stdout
+    this.offset = init.offset
   }
 
   static fromOpRecord(rec: OpRecord, agent: string, session: string, cwd?: string): LogEntry {
     const init: LogEntryInit = {
-      type: 'op',
+      type: EVENT_OP,
       agent,
       session,
       timestamp: rec.timestamp,
@@ -73,20 +83,6 @@ export class LogEntry {
       source: rec.source,
       bytes: rec.bytes,
       durationMs: rec.durationMs,
-    }
-    if (cwd !== undefined) init.cwd = cwd
-    return new LogEntry(init)
-  }
-
-  static fromExecutionRecord(rec: ExecutionRecord, cwd?: string): LogEntry {
-    const init: LogEntryInit = {
-      type: 'command',
-      agent: rec.agent,
-      session: rec.sessionId,
-      timestamp: Math.floor(rec.timestamp * 1000),
-      command: rec.command,
-      exitCode: rec.exitCode,
-      stdout: new TextDecoder('utf-8', { fatal: false }).decode(rec.stdout).slice(0, 4096),
     }
     if (cwd !== undefined) init.cwd = cwd
     return new LogEntry(init)
@@ -108,6 +104,7 @@ export class LogEntry {
     if (this.command !== undefined) obj.command = this.command
     if (this.exitCode !== undefined) obj.exit_code = this.exitCode
     if (this.stdout !== undefined) obj.stdout = this.stdout
+    if (this.offset !== undefined) obj.offset = this.offset
     return JSON.stringify(obj)
   }
 }

@@ -29,6 +29,7 @@ export {
   handleWhoami,
 } from './vars.ts'
 export { handleMan } from './man.ts'
+export { handleHistory } from './history.ts'
 export { handleBash, handleEval, handleSleep, handleSource } from './script.ts'
 export { handleTest } from './condition.ts'
 export { handleEcho, handlePrintf } from './text.ts'
