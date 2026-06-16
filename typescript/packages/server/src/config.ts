@@ -194,7 +194,6 @@ export interface WorkspaceConfigRaw {
   consistency?: string
   defaultSessionId?: string
   defaultAgentId?: string
-  history?: number | null
   cache?: RamCacheBlock | RedisCacheBlock | null
   index?: RamIndexBlock | RedisIndexBlock | null
 }
@@ -245,7 +244,6 @@ export interface WorkspaceArgs {
     sessionId: string
     agentId: string
     fuseMounts?: Record<string, boolean | string>
-    historyLimit?: number
     cache?: FileCache & Resource
     index?: IndexConfig
   }
@@ -306,7 +304,6 @@ export async function configToWorkspaceArgs(cfg: WorkspaceConfigRaw): Promise<Wo
       sessionId: cfg.defaultSessionId ?? 'default',
       agentId: cfg.defaultAgentId ?? 'default',
       ...(Object.keys(fuseMounts).length > 0 ? { fuseMounts } : {}),
-      ...(typeof cfg.history === 'number' ? { historyLimit: cfg.history } : {}),
       ...(cache !== undefined ? { cache } : {}),
       ...(index !== undefined ? { index } : {}),
     },

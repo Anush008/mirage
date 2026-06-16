@@ -53,14 +53,11 @@ def _ws():
     ram._store.files["/nums.txt"] = b"5\n3\n1\n4\n2\n"
     ram._store.files["/words.txt"] = b"banana\napple\ncherry\napple\n"
 
-    ws = Workspace(
-        resources={
-            "/s3/": (s3, MountMode.EXEC),
-            "/disk/": (disk, MountMode.EXEC),
-            "/ram/": (ram, MountMode.EXEC),
-        },
-        history=None,
-    )
+    ws = Workspace(resources={
+        "/s3/": (s3, MountMode.EXEC),
+        "/disk/": (disk, MountMode.EXEC),
+        "/ram/": (ram, MountMode.EXEC),
+    }, )
     ws.get_session(DEFAULT_SESSION_ID).cwd = "/s3"
     return ws
 
@@ -1897,10 +1894,7 @@ def test_bash_dash_c_for_loop_over_dirs():
     })
     s3._store.files["/INBOX/2026-04-28/m1.txt"] = b""
     s3._store.files["/INBOX/2026-04-29/m2.txt"] = b""
-    ws = Workspace(
-        resources={"/gmail/": (s3, MountMode.EXEC)},
-        history=None,
-    )
+    ws = Workspace(resources={"/gmail/": (s3, MountMode.EXEC)}, )
     cmd = ('bash -lc \'for d in /gmail/INBOX/2026-04-28 '
            '/gmail/INBOX/2026-04-29; do echo "== $d =="; ls "$d"; done\'')
     io = _exec(ws, cmd)
@@ -2385,14 +2379,14 @@ def test_unmount_closes_resource_when_owned():
 
 
 def test_unmount_rejects_reserved_prefixes():
-    """unmount of cache root / observer / dev / unknown prefix raises."""
+    """unmount of cache root / history view / dev / unknown prefix raises."""
     ws = _ws()
     import pytest
 
     with pytest.raises(ValueError, match="cache root"):
         asyncio.run(ws.unmount("/"))
-    with pytest.raises(ValueError, match="observer prefix"):
-        asyncio.run(ws.unmount("/.sessions"))
+    with pytest.raises(ValueError, match="history view"):
+        asyncio.run(ws.unmount("/.bash_history"))
     with pytest.raises(ValueError, match="reserved"):
         asyncio.run(ws.unmount("/dev"))
     with pytest.raises(ValueError, match="no mount at prefix"):
@@ -2413,10 +2407,7 @@ def test_unmount_after_close_raises():
 
 
 def test_cd_nonexistent_under_mount_keeps_cwd():
-    ws = Workspace(
-        resources={"/": (RAMResource(), MountMode.WRITE)},
-        history=None,
-    )
+    ws = Workspace(resources={"/": (RAMResource(), MountMode.WRITE)}, )
     before = ws.get_session(DEFAULT_SESSION_ID).cwd
     io = _exec(ws, "cd /missing")
     assert io.exit_code != 0
@@ -2425,13 +2416,10 @@ def test_cd_nonexistent_under_mount_keeps_cwd():
 
 
 def test_cd_into_mount_root_succeeds():
-    ws = Workspace(
-        resources={
-            "/": (RAMResource(), MountMode.WRITE),
-            "/data/": (RAMResource(), MountMode.WRITE),
-        },
-        history=None,
-    )
+    ws = Workspace(resources={
+        "/": (RAMResource(), MountMode.WRITE),
+        "/data/": (RAMResource(), MountMode.WRITE),
+    }, )
     io = _exec(ws, "cd /data")
     assert io.exit_code == 0
     assert ws.get_session(DEFAULT_SESSION_ID).cwd == "/data"
@@ -2441,13 +2429,10 @@ def test_cd_into_mount_root_succeeds():
 
 
 def _ws_for_ls(mounts: dict[str, RAMResource]) -> Workspace:
-    return Workspace(
-        resources={
-            p: (r, MountMode.WRITE)
-            for p, r in mounts.items()
-        },
-        history=None,
-    )
+    return Workspace(resources={
+        p: (r, MountMode.WRITE)
+        for p, r in mounts.items()
+    }, )
 
 
 def test_ls_root_shows_child_mount_data():
@@ -2466,12 +2451,12 @@ def test_ls_classify_child_mount_with_trailing_slash():
     assert "data/" in out.split("\n")
 
 
-def test_ls_hides_dot_sessions_by_default_shows_with_a():
+def test_ls_hides_dot_bash_history_by_default_shows_with_a():
     ws = _ws_for_ls({"/": RAMResource()})
     plain = _exec(ws, "ls /")
-    assert ".sessions" not in _stdout(plain).decode().split("\n")
+    assert ".bash_history" not in _stdout(plain).decode().split("\n")
     all_io = _exec(ws, "ls -a /")
-    assert ".sessions" in _stdout(all_io).decode().split("\n")
+    assert ".bash_history" in _stdout(all_io).decode().split("\n")
 
 
 def test_ls_does_not_duplicate_existing_entry():

@@ -44,7 +44,7 @@ async def create_workspace(req: CreateWorkspaceRequest,
         entry = registry.add(ws, workspace_id=req.id)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    return make_detail(entry)
+    return await make_detail(entry)
 
 
 @router.get("", response_model=list[WorkspaceBrief])
@@ -59,7 +59,7 @@ async def get_workspace(
     registry = request.app.state.registry
     if workspace_id not in registry:
         raise HTTPException(status_code=404, detail="workspace not found")
-    return make_detail(registry.get(workspace_id), verbose=verbose)
+    return await make_detail(registry.get(workspace_id), verbose=verbose)
 
 
 @router.delete("/{workspace_id}", response_model=DeleteWorkspaceResponse)
@@ -91,7 +91,7 @@ async def clone_workspace(workspace_id: str, req: CloneWorkspaceRequest,
         entry = registry.add(new_ws, workspace_id=req.id)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    return make_detail(entry)
+    return await make_detail(entry)
 
 
 @router.post("/{workspace_id}/snapshot",
@@ -131,7 +131,7 @@ async def load_workspace(req: LoadWorkspaceRequest,
                             detail=f"workspace id already exists: {req.id!r}")
     resources = _build_load_resources(req.override)
     try:
-        ws = Workspace.load(str(safe_path), resources=resources)
+        ws = await Workspace.load(str(safe_path), resources=resources)
     except FileNotFoundError:
         raise HTTPException(status_code=400,
                             detail=f"snapshot not found: {req.path}")
@@ -141,7 +141,7 @@ async def load_workspace(req: LoadWorkspaceRequest,
         entry = registry.add(ws, workspace_id=req.id)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    return make_detail(entry)
+    return await make_detail(entry)
 
 
 def _build_load_resources(override: dict[str, Any] | None) -> dict | None:

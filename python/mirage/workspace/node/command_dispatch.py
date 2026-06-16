@@ -35,9 +35,9 @@ from mirage.shell.helpers import (  # isort: skip
     get_process_sub_direction, get_text)
 from mirage.workspace.executor.builtins import (  # isort: skip
     handle_bash, handle_cd, handle_echo, handle_eval, handle_export,
-    handle_local, handle_man, handle_printenv, handle_printf, handle_read,
-    handle_return, handle_set, handle_shift, handle_sleep, handle_source,
-    handle_test, handle_trap, handle_unset, handle_whoami)
+    handle_history, handle_local, handle_man, handle_printenv, handle_printf,
+    handle_read, handle_return, handle_set, handle_shift, handle_sleep,
+    handle_source, handle_test, handle_trap, handle_unset, handle_whoami)
 
 _UNSUPPORTED_BUILTINS = frozenset({
     "bg",
@@ -59,7 +59,6 @@ async def execute_command(
     stdin,
     call_stack,
     job_table,
-    history: object = None,
     cancel: asyncio.Event | None = None,
 ) -> tuple[Any, IOResult, ExecutionNode]:
     """Dispatch a command node by name."""
@@ -117,7 +116,7 @@ async def execute_command(
     try:
         body = _dispatch_command_body(recurse, dispatch, registry, execute_fn,
                                       node, parts, name, session, stdin,
-                                      call_stack, job_table, history, cancel)
+                                      call_stack, job_table, cancel)
         return await run_with_timeout(body, timeout, name or "?")
     finally:
         for k, prev in saved_env_overrides.items():
@@ -139,7 +138,6 @@ async def _dispatch_command_body(
     stdin,
     call_stack,
     job_table,
-    history: object = None,
     cancel: asyncio.Event | None = None,
 ) -> tuple[Any, IOResult, ExecutionNode]:
     for child in node.named_children:
@@ -231,6 +229,9 @@ async def _dispatch_command_body(
             else:
                 path = classify_bare_path(raw_str, registry, session.cwd)
         return await handle_cd(dispatch, registry.is_mount_root, path, session)
+
+    if name == SB.HISTORY:
+        return await handle_history(registry, expanded[1:], session)
 
     if name == SB.TRUE:
         return None, IOResult(), ExecutionNode(command="true", exit_code=0)
@@ -346,5 +347,4 @@ async def _dispatch_command_body(
                                 session,
                                 stdin,
                                 call_stack,
-                                job_table=job_table,
-                                history=history)
+                                job_table=job_table)

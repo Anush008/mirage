@@ -190,7 +190,7 @@ async def main() -> None:
         await ws.snapshot(snap)
         print(f"  saved → {snap} ({os.path.getsize(snap)} bytes)")
 
-        loaded = Workspace.load(snap)
+        loaded = await Workspace.load(snap)
         r = await loaded.execute("cat /data/hello.txt")
         print(f"  loaded ws cat: {(await r.stdout_str()).strip()!r}")
 

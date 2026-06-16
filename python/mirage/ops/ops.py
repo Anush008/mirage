@@ -74,9 +74,7 @@ class Ops:
             duration_ms=elapsed,
         )
         self.records.append(rec)
-        # Skip logging ops on the log file itself to avoid feedback loop
-        if self._observer is not None and not path.startswith(
-                self._observer.prefix):
+        if self._observer is not None:
             asyncio.ensure_future(
                 self._observer.log_op(rec, self._agent_id, self._session_id))
 

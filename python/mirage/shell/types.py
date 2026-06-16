@@ -165,6 +165,7 @@ class ShellBuiltin(StrEnum):
     PRINTENV = "printenv"
     WHOAMI = "whoami"
     MAN = "man"
+    HISTORY = "history"
     # control
     TRUE = "true"
     FALSE = "false"

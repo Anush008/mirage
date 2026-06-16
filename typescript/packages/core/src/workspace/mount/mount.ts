@@ -16,7 +16,6 @@ import { type Accessor, NOOPAccessor } from '../../accessor/base.ts'
 import type {
   CommandDispatch,
   CommandFn,
-  CommandHistory,
   CommandOpts,
   RegisteredCommand,
 } from '../../commands/config.ts'
@@ -321,7 +320,6 @@ export class Mount {
       stdin?: ByteSource | null
       cwd?: string
       dispatch?: CommandDispatch
-      history?: CommandHistory
       sessionId?: string
       env?: Record<string, string>
       execAllowed?: boolean
@@ -372,7 +370,6 @@ export class Mount {
       resource: this.resource,
       ...(this.resource.index !== undefined ? { index: this.resource.index } : {}),
       ...(opts.dispatch !== undefined ? { dispatch: opts.dispatch } : {}),
-      ...(opts.history !== undefined ? { history: opts.history } : {}),
       ...(opts.sessionId !== undefined ? { sessionId: opts.sessionId } : {}),
       ...(opts.env !== undefined ? { env: opts.env } : {}),
       ...(opts.execAllowed !== undefined ? { execAllowed: opts.execAllowed } : {}),

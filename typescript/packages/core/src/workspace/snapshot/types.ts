@@ -12,6 +12,7 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import type { EventDict } from '../../observe/observer.ts'
 import type { RAMResourceState } from '../../resource/ram/ram.ts'
 
 export interface ResourceStateBase {
@@ -105,7 +106,7 @@ export interface WorkspaceStateDict {
   sessions: SessionSnapshot[]
   mounts: MountSnapshot[]
   cache: CacheSnapshot
-  history: ExecutionRecordSnapshot[]
+  history: EventDict[]
   jobs: JobSnapshot[]
   /**
    * Per-path fingerprint/revision pairs captured at snapshot time.

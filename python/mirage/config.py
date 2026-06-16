@@ -173,7 +173,6 @@ class WorkspaceConfig(BaseModel):
     consistency: ConsistencyPolicy = ConsistencyPolicy.LAZY
     default_session_id: str = "default"
     default_agent_id: str = "default"
-    history: int | None = 100
     cache: CacheBlock | None = None
     index: IndexBlock | None = None
 
@@ -213,7 +212,6 @@ class WorkspaceConfig(BaseModel):
             "session_id": self.default_session_id,
             "agent_id": self.default_agent_id,
             "fuse_mounts": fuse_mounts,
-            "history": self.history,
         }
         if self.cache is not None:
             kwargs["cache"] = _build_cache_config(self.cache)

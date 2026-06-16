@@ -60,7 +60,6 @@ async def test_run_command_tree_materializes_stdout(registry):
         _session(),
         None,
         None,
-        None,
     )
     assert io.exit_code == 0
     assert b"hello" in await materialize(io.stdout)
@@ -78,7 +77,6 @@ async def test_run_command_tree_propagates_exit_code(registry):
         "agent",
         ast,
         _session(),
-        None,
         None,
         None,
     )

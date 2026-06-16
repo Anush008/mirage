@@ -96,11 +96,12 @@ async def main():
             rating = doc.get("rating", "?")
             print(f"  {title} (rating={rating})")
 
-        print("\n--- session observer ---")
-        day_folders = vos.listdir("/.sessions")
-        log_entries = vos.listdir(day_folders[0]) if day_folders else []
-        for e in log_entries[:3]:
-            print(f"  {e}")
+        print("\n--- bash history ---")
+        with open("/.bash_history") as f:
+            for i, line in enumerate(f):
+                if i >= 6:
+                    break
+                print(f"  {line.rstrip()[:120]}")
 
         records = ws.ops.records
         total = sum(r.bytes for r in records)

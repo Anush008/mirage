@@ -12,7 +12,6 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import type { CommandHistory } from '../../commands/config.ts'
 import { type ByteSource, IOResult, materialize } from '../../io/types.ts'
 import { classifyArgvBySpec } from './classify_argv.ts'
 import type { Resource } from '../../resource/base.ts'
@@ -43,6 +42,7 @@ import {
   handleEcho,
   handleEval,
   handleExport,
+  handleHistory,
   handleLocal,
   handleMan,
   handlePrintenv,
@@ -92,7 +92,6 @@ export async function executeCommand(
   ensureOpen?: (resource: Resource) => Promise<void>,
   unmount?: (prefix: string) => Promise<void>,
   pythonRuntime?: PyodideRuntime,
-  history?: CommandHistory,
   signal?: AbortSignal,
 ): Promise<Result> {
   const name = getCommandName(node)
@@ -165,7 +164,6 @@ export async function executeCommand(
         ensureOpen,
         unmount,
         pythonRuntime,
-        history,
         signal,
       ),
       timeout,
@@ -203,7 +201,6 @@ async function runCommandBody(
   ensureOpen?: (resource: Resource) => Promise<void>,
   unmount?: (prefix: string) => Promise<void>,
   pythonRuntime?: PyodideRuntime,
-  history?: CommandHistory,
   signal?: AbortSignal,
 ): Promise<Result> {
   let stdin = stdinIn
@@ -327,6 +324,7 @@ async function runCommandBody(
   }
   if (name === SB.WHOAMI) return handleWhoami(session)
   if (name === SB.MAN) return handleMan(finalExpanded.slice(1), session, registry)
+  if (name === SB.HISTORY) return handleHistory(registry, finalExpanded.slice(1), session)
   if (name === SB.SET) return handleSet(finalExpanded.slice(1), session, callStack)
   if (name === SB.SHIFT) {
     const n = finalExpanded.length > 1 ? Number(finalExpanded[1]) : 1
@@ -395,7 +393,6 @@ async function runCommandBody(
     jobTable,
     ensureOpen,
     unmount,
-    history,
     pythonRuntime,
   )
 }

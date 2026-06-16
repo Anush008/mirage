@@ -53,8 +53,8 @@ def blob_to_meta(data: bytes) -> dict:
     return json.loads(data.decode("utf-8"))
 
 
-def to_tree_inputs(ws) -> tuple[dict[str, bytes], dict]:
-    return tree_inputs_from_state(to_state_dict(ws))
+async def to_tree_inputs(ws) -> tuple[dict[str, bytes], dict]:
+    return tree_inputs_from_state(await to_state_dict(ws))
 
 
 def tree_inputs_from_state(state: dict) -> tuple[dict[str, bytes], dict]:

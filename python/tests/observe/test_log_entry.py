@@ -13,10 +13,9 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import json
-import time
 
 from mirage.observe import LogEntry, OpRecord
-from mirage.workspace.types import ExecutionNode, ExecutionRecord
+from mirage.observe.log_entry import EVENT_COMMAND
 
 
 def test_from_op_record():
@@ -39,23 +38,17 @@ def test_from_op_record():
     assert entry.duration_ms == 45
 
 
-def test_from_execution_record():
-    rec = ExecutionRecord(
-        agent="agent-1",
-        command="grep foo /data/bar",
-        stdout=b"matched line\n",
-        stdin=None,
+def _command_entry(cwd: str | None = None) -> LogEntry:
+    return LogEntry(
+        type=EVENT_COMMAND,
+        agent="a",
+        session="s",
+        timestamp=1000,
+        cwd=cwd,
+        command="ls",
         exit_code=0,
-        tree=ExecutionNode(command="grep foo /data/bar"),
-        timestamp=time.time(),
-        session_id="sess-1",
+        stdout="out",
     )
-    entry = LogEntry.from_execution_record(rec)
-    assert entry.type == "command"
-    assert entry.agent == "agent-1"
-    assert entry.session == "sess-1"
-    assert entry.command == "grep foo /data/bar"
-    assert entry.exit_code == 0
 
 
 def test_to_json_line_op():
@@ -77,17 +70,7 @@ def test_to_json_line_op():
 
 
 def test_to_json_line_command():
-    rec = ExecutionRecord(
-        agent="a",
-        command="ls",
-        stdout=b"out",
-        stdin=None,
-        exit_code=0,
-        tree=ExecutionNode(command="ls"),
-        timestamp=1.0,
-        session_id="s",
-    )
-    entry = LogEntry.from_execution_record(rec)
+    entry = _command_entry()
     line = entry.to_json_line()
     parsed = json.loads(line)
     assert parsed["type"] == "command"
@@ -110,17 +93,7 @@ def test_log_entry_includes_cwd_for_op():
 
 
 def test_log_entry_includes_cwd_for_command():
-    rec = ExecutionRecord(
-        agent="a",
-        command="ls",
-        stdout=b"out",
-        stdin=None,
-        exit_code=0,
-        tree=ExecutionNode(command="ls"),
-        timestamp=1.0,
-        session_id="s",
-    )
-    entry = LogEntry.from_execution_record(rec, cwd="/data")
+    entry = _command_entry(cwd="/data")
     parsed = json.loads(entry.to_json_line())
     assert parsed["cwd"] == "/data"
 

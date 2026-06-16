@@ -130,13 +130,13 @@ async def main() -> None:
         print(f"  saved → {snap} ({os.path.getsize(snap)} bytes)")
 
         # Load with default fresh tmpdir
-        loaded_default = Workspace.load(snap)
+        loaded_default = await Workspace.load(snap)
         r = await loaded_default.execute("ls /data/")
         print(f"  loaded (default tmpdir) ls: "
               f"{(await r.stdout_str()).strip()[:80]}…")
 
         # Load with caller-supplied root — files written into custom_root
-        loaded_custom = Workspace.load(
+        loaded_custom = await Workspace.load(
             snap, resources={"/data": DiskResource(root=custom_root)})
         r = await loaded_custom.execute("ls /data/")
         print(f"  loaded (root={custom_root[:40]}…) ls: "

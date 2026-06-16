@@ -104,9 +104,6 @@ export function registerWorkspacesRoutes(app: FastifyInstance, deps: WorkspaceRo
         agentId: args.options.agentId,
         ...(args.options.fuseMounts !== undefined ? { fuseMounts: args.options.fuseMounts } : {}),
         ...(Object.keys(commandSafeguards).length > 0 ? { commandSafeguards } : {}),
-        ...(args.options.historyLimit !== undefined
-          ? { historyLimit: args.options.historyLimit }
-          : {}),
         ...(args.options.cache !== undefined ? { cache: args.options.cache } : {}),
         ...(args.options.index !== undefined ? { index: args.options.index } : {}),
       })
@@ -116,7 +113,7 @@ export function registerWorkspacesRoutes(app: FastifyInstance, deps: WorkspaceRo
       } catch (e) {
         return reply.status(409).send({ detail: (e as Error).message })
       }
-      return reply.status(201).send(makeDetail(entry))
+      return reply.status(201).send(await makeDetail(entry))
     },
   )
 
@@ -164,17 +161,17 @@ export function registerWorkspacesRoutes(app: FastifyInstance, deps: WorkspaceRo
       } catch (e) {
         return reply.status(409).send({ detail: (e as Error).message })
       }
-      return reply.status(201).send(makeDetail(entry))
+      return reply.status(201).send(await makeDetail(entry))
     },
   )
 
   app.get<{ Params: WorkspaceIdParams; Querystring: WorkspaceGetQuery }>(
     '/v1/workspaces/:id',
-    (req, reply) => {
+    async (req, reply) => {
       const { id } = req.params
       if (!deps.registry.has(id)) return reply.status(404).send({ detail: 'workspace not found' })
       const verbose = req.query.verbose === 'true'
-      return makeDetail(deps.registry.get(id), verbose)
+      return await makeDetail(deps.registry.get(id), verbose)
     },
   )
 
@@ -202,7 +199,7 @@ export function registerWorkspacesRoutes(app: FastifyInstance, deps: WorkspaceRo
       } catch (e) {
         return reply.status(409).send({ detail: (e as Error).message })
       }
-      return reply.status(201).send(makeDetail(entry))
+      return reply.status(201).send(await makeDetail(entry))
     },
   )
 

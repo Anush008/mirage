@@ -666,7 +666,23 @@ export const BUILTIN_SPECS: Readonly<Record<string, CommandSpec>> = Object.freez
   }),
   history: new CommandSpec({
     description: 'Show command history for the session.',
-    options: [new Option({ short: '-c', description: 'Clear the command history.' })],
+    options: [
+      new Option({ short: '-c', description: 'Clear the command history.' }),
+      new Option({
+        short: '-d',
+        valueKind: OperandKind.TEXT,
+        description: 'Delete the history entry at the given offset.',
+      }),
+      new Option({
+        short: '-s',
+        description: 'Append the args as a single entry without running.',
+      }),
+      new Option({ short: '-p', description: 'Print the args without storing them.' }),
+      new Option({ short: '-a', description: 'Append: no-op (file and store are the same).' }),
+      new Option({ short: '-r', description: 'Read: no-op (file and store are the same).' }),
+      new Option({ short: '-w', description: 'Write: no-op (file and store are the same).' }),
+      new Option({ short: '-n', description: 'Read-new: no-op (file and store are the same).' }),
+    ],
     rest: new Operand({ kind: OperandKind.TEXT }),
   }),
   date: new CommandSpec({

@@ -13,11 +13,21 @@
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import { describe, expect, it } from 'vitest'
-import { LogEntry } from './log_entry.ts'
+import { EVENT_COMMAND, LogEntry } from './log_entry.ts'
 import { OpRecord } from './record.ts'
-import { ExecutionNode, ExecutionRecord } from '../workspace/types.ts'
 
-const ENC = new TextEncoder()
+function commandEntry(cwd?: string): LogEntry {
+  return new LogEntry({
+    type: EVENT_COMMAND,
+    agent: 'a',
+    session: 's',
+    timestamp: 1000,
+    ...(cwd !== undefined ? { cwd } : {}),
+    command: 'ls',
+    exitCode: 0,
+    stdout: 'out',
+  })
+}
 
 describe('LogEntry.fromOpRecord', () => {
   it('copies fields from an OpRecord with agent + session', () => {
@@ -41,27 +51,6 @@ describe('LogEntry.fromOpRecord', () => {
   })
 })
 
-describe('LogEntry.fromExecutionRecord', () => {
-  it('copies fields from an ExecutionRecord', () => {
-    const rec = new ExecutionRecord({
-      agent: 'agent-1',
-      command: 'grep foo /data/bar',
-      stdout: ENC.encode('matched line\n'),
-      stdin: null,
-      exitCode: 0,
-      tree: new ExecutionNode({ command: 'grep foo /data/bar' }),
-      timestamp: Date.now() / 1000,
-      sessionId: 'sess-1',
-    })
-    const entry = LogEntry.fromExecutionRecord(rec)
-    expect(entry.type).toBe('command')
-    expect(entry.agent).toBe('agent-1')
-    expect(entry.session).toBe('sess-1')
-    expect(entry.command).toBe('grep foo /data/bar')
-    expect(entry.exitCode).toBe(0)
-  })
-})
-
 describe('LogEntry.toJsonLine', () => {
   it('emits only op fields for an op entry (no command key)', () => {
     const rec = new OpRecord({
@@ -81,17 +70,7 @@ describe('LogEntry.toJsonLine', () => {
   })
 
   it('emits only command fields for a command entry (no op key)', () => {
-    const rec = new ExecutionRecord({
-      agent: 'a',
-      command: 'ls',
-      stdout: ENC.encode('out'),
-      stdin: null,
-      exitCode: 0,
-      tree: new ExecutionNode({ command: 'ls' }),
-      timestamp: 1.0,
-      sessionId: 's',
-    })
-    const entry = LogEntry.fromExecutionRecord(rec)
+    const entry = commandEntry()
     const parsed = JSON.parse(entry.toJsonLine()) as Record<string, unknown>
     expect(parsed.type).toBe('command')
     expect(parsed.command).toBe('ls')
@@ -113,18 +92,7 @@ describe('LogEntry.toJsonLine', () => {
   })
 
   it('includes cwd when provided for command entries', () => {
-    const rec = new ExecutionRecord({
-      agent: 'a',
-      command: 'ls',
-      stdout: ENC.encode('out'),
-      stdin: null,
-      exitCode: 0,
-      tree: new ExecutionNode({ command: 'ls' }),
-      timestamp: 1.0,
-      sessionId: 's',
-    })
-    const entry = LogEntry.fromExecutionRecord(rec, '/data')
-    const parsed = JSON.parse(entry.toJsonLine()) as Record<string, unknown>
+    const parsed = JSON.parse(commandEntry('/data').toJsonLine()) as Record<string, unknown>
     expect(parsed.cwd).toBe('/data')
   })
 

@@ -39,11 +39,6 @@ export type CommandDispatch = (
   kwargs?: Record<string, unknown>,
 ) => Promise<[unknown, IOResult]>
 
-export interface CommandHistory {
-  entries(): readonly { readonly command: string; readonly sessionId: string }[]
-  clear(): void
-}
-
 export interface CommandOpts {
   stdin: ByteSource | null
   flags: Record<string, string | boolean | string[]>
@@ -54,7 +49,6 @@ export interface CommandOpts {
   command?: string
   index?: IndexCacheStore | null
   dispatch?: CommandDispatch
-  history?: CommandHistory
   sessionId?: string
   env?: Record<string, string>
   execAllowed?: boolean

@@ -169,7 +169,7 @@ export function registerVersionsRoutes(app: FastifyInstance, deps: VersionRoutes
         }
         throw e
       }
-      return makeDetail(deps.registry.get(id))
+      return await makeDetail(deps.registry.get(id))
     },
   )
 
@@ -199,7 +199,7 @@ export function registerVersionsRoutes(app: FastifyInstance, deps: VersionRoutes
     }
     try {
       const entry = deps.registry.add(ws, id)
-      return await reply.status(201).send(makeDetail(entry))
+      return await reply.status(201).send(await makeDetail(entry))
     } catch (e) {
       return reply.status(409).send({ detail: (e as Error).message })
     }

@@ -1402,6 +1402,24 @@ atroot
 at_root.txt
 === root_create_dirname ===
 /data
+=== history_last_two ===
+375  basename /data/at_root.txt
+376  dirname /data/at_root.txt
+=== bash_history_tail ===
+basename /data/at_root.txt
+dirname /data/at_root.txt
+history 2
+=== history_find_view ===
+/.bash_history
+=== history_find_no_dir ===
+
+=== bash_history_after_find ===
+find /.bash_history -type d
+=== bash_history_format ===
+#TS
+find /.bash_history -type d
+#TS
+grep -v '^#' /.bash_history | tail -n 1
 === jq_no_filter_no_input ===
 exit=0
 === jq_dot_no_input ===

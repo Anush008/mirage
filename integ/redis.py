@@ -23,6 +23,7 @@ import os  # noqa: E402
 import uuid  # noqa: E402
 
 from mirage import MountMode, Workspace  # noqa: E402
+from mirage.observe.redis_store import RedisObserverStore  # noqa: E402
 from mirage.resource.redis import RedisResource  # noqa: E402
 
 sys.path.insert(0, _INTEG_DIR)
@@ -33,10 +34,14 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 
 async def main() -> None:
-    prefix = f"mirage-integ-{uuid.uuid4().hex[:8]}/"
+    run_id = uuid.uuid4().hex[:8]
+    prefix = f"mirage-integ-{run_id}/"
     resource = RedisResource(url=REDIS_URL, key_prefix=prefix)
-    ws = Workspace({"/data": resource}, mode=MountMode.WRITE)
+    observe = RedisObserverStore(url=REDIS_URL,
+                                 key_prefix=f"mirage-integ-observer-{run_id}:")
+    ws = Workspace({"/data": resource}, mode=MountMode.WRITE, observe=observe)
     await run_cases(ws)
+    await observe.clear()
 
 
 if __name__ == "__main__":

@@ -12,7 +12,6 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import type { CommandHistory } from '../../commands/config.ts'
 import { parseCommand, parseToKwargs } from '../../commands/spec/parser.ts'
 import { concatBytes } from '../../core/jq/format.ts'
 import { OperandKind } from '../../commands/spec/types.ts'
@@ -70,7 +69,6 @@ export async function handleCommand(
   jobTable: JobTable | null = null,
   ensureOpen?: (resource: Resource) => Promise<void>,
   unmount?: (prefix: string) => Promise<void>,
-  history?: CommandHistory,
   pythonRuntime?: PyodideRuntime,
 ): Promise<Result> {
   if (parts.length === 0) {
@@ -274,7 +272,6 @@ export async function handleCommand(
       stdin,
       cwd: session.cwd,
       dispatch,
-      ...(history !== undefined ? { history } : {}),
       sessionId: session.sessionId,
       env: session.env,
       execAllowed: registry.isExecAllowed(),

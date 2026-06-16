@@ -25,6 +25,7 @@ FINGERPRINTS=(
   "cat /redis/h.txt"
   "cat /minio/data/x.txt"
   "cat /ram/f.txt /disk/g.txt | wc -l"
+  "grep -v '^#' /.bash_history | head -n 1"
 )
 
 freeport() { lsof -ti:8765 2>/dev/null | xargs kill -9 2>/dev/null; sleep 1; }
@@ -32,11 +33,13 @@ stdout_of() { jq -r '.stdout // .result.stdout // empty'; }
 
 seed() {
   local cli="$1" id="$2"
+  $cli execute -w "$id" -c "echo cross-history-marker" >/dev/null
   $cli execute -w "$id" -c "printf 'ram-a\nram-b\n' > /ram/f.txt" >/dev/null
   $cli execute -w "$id" -c "printf 'disk-1\ndisk-2\ndisk-3\n' > /disk/g.txt" >/dev/null
   $cli execute -w "$id" -c "printf 'redis-x\nredis-y\n' > /redis/h.txt" >/dev/null
   $cli execute -w "$id" -c "printf 'minio-1\nminio-2\n' > /minio/data/x.txt" >/dev/null
   $cli execute -w "$id" -c "printf '1\n2\n3\n4\n5\n' > /guard/big.txt" >/dev/null
+  $cli execute -w "$id" -c "echo cross-history-marker" >/dev/null
 }
 
 # The /guard mount in cross.yaml caps `cat` at 2 lines. Safeguards apply at

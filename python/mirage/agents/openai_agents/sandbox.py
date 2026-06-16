@@ -116,7 +116,7 @@ class MirageSandboxSession(BaseSandboxSession):
         if hasattr(data, "seek"):
             data.seek(0)
         state = read_tar(data)
-        apply_state_dict(self._ws, state)
+        await apply_state_dict(self._ws, state)
 
 
 class MirageSandboxClient(BaseSandboxClient[None]):

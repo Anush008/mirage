@@ -12,18 +12,21 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import { MountMode, RedisResource, Workspace } from '@struktoai/mirage-node'
+import { MountMode, RedisObserverStore, RedisResource, Workspace } from '@struktoai/mirage-node'
 import { runCases } from './cases.ts'
 
 async function main(): Promise<void> {
   const url = process.env.REDIS_URL ?? 'redis://localhost:6379/0'
-  const keyPrefix = `mirage-integ-${String(process.pid)}-${String(Date.now())}`
-  const resource = new RedisResource({ url, keyPrefix })
-  const ws = new Workspace({ '/data': resource }, { mode: MountMode.WRITE })
+  const runId = `${String(process.pid)}-${String(Date.now())}`
+  const resource = new RedisResource({ url, keyPrefix: `mirage-integ-${runId}` })
+  const observe = new RedisObserverStore({ url, keyPrefix: `mirage-integ-observer-${runId}:` })
+  const ws = new Workspace({ '/data': resource }, { mode: MountMode.WRITE, observe })
   try {
     await runCases(ws)
+    await observe.clear()
   } finally {
     await ws.close()
+    await observe.close()
   }
 }
 

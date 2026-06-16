@@ -69,7 +69,7 @@ describe('toStateDict / applyStateDict', () => {
     const ws = buildWorkspace()
     await ws.execute('echo "one"')
     await ws.execute('echo "two"')
-    expect(ws.history.entries().length).toBe(2)
+    expect((await ws.history()).length).toBe(2)
     const path = join(tempDir, 'history.json')
     await ws.snapshot(path)
     const loaded = await Workspace.load(path, {
@@ -77,7 +77,7 @@ describe('toStateDict / applyStateDict', () => {
       ops: new OpsRegistry(),
       shellParser: parser,
     })
-    const entries = loaded.history.entries()
+    const entries = await loaded.history()
     expect(entries.length).toBe(2)
     expect(entries[0]?.command).toBe('echo "one"')
     expect(entries[1]?.command).toBe('echo "two"')
@@ -116,12 +116,12 @@ describe('toStateDict / applyStateDict', () => {
     await restored.close()
   })
 
-  it('skips the .sessions/ observer mount from the snapshot', async () => {
+  it('skips the .bash_history/ view mount from the snapshot', async () => {
     const ws = buildWorkspace()
     await ws.execute('echo "hi" | tee /data/x.txt')
     const state = await toStateDict(ws)
     for (const m of state.mounts) {
-      expect(m.prefix).not.toBe('/.sessions/')
+      expect(m.prefix).not.toBe('/.bash_history/')
     }
     await ws.close()
   })

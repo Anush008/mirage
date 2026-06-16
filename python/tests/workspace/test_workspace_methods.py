@@ -31,6 +31,10 @@ from tests.integration.s3_mock import patch_s3_multi
 REDIS_URL = os.environ.get("REDIS_URL", "")
 
 
+def _load(*args, **kwargs):
+    return asyncio.run(Workspace.load(*args, **kwargs))
+
+
 def _read(ws, path):
 
     async def _do():
@@ -52,7 +56,7 @@ def test_workspace_save_then_load_classmethod(tmp_path):
     asyncio.run(src.snapshot(snap))
     assert snap.exists() and snap.stat().st_size > 0
 
-    dst = Workspace.load(snap)
+    dst = _load(snap)
     assert _read(dst, "/m/a.txt") == "hi\n"
 
 
@@ -63,7 +67,7 @@ def test_workspace_save_compressed(tmp_path):
 
     snap = tmp_path / "ws.tar.gz"
     asyncio.run(src.snapshot(snap, compress="gz"))
-    dst = Workspace.load(snap)
+    dst = _load(snap)
     assert _read(dst, "/m/a.txt") == "hi\n"
 
 
@@ -80,8 +84,7 @@ def test_workspace_load_with_disk_override(tmp_path):
 
     dst_root = tmp_path / "dst"
     dst_root.mkdir()
-    dst = Workspace.load(snap,
-                         resources={"/m": DiskResource(root=str(dst_root))})
+    dst = _load(snap, resources={"/m": DiskResource(root=str(dst_root))})
     assert _read(dst, "/m/a.txt") == "hello\n"
     assert (dst_root / "a.txt").read_bytes() == b"hello\n"
 
@@ -146,7 +149,7 @@ def test_save_load_preserves_max_drain_bytes(tmp_path):
     snap = tmp_path / "ws.tar"
     asyncio.run(src.snapshot(snap))
 
-    dst = Workspace.load(snap)
+    dst = _load(snap)
     assert dst.max_drain_bytes == 1234
 
 
@@ -159,14 +162,14 @@ def test_history_round_trip(tmp_path):
     asyncio.run(src.execute("echo a > /m/a.txt"))
     asyncio.run(src.execute("echo b > /m/b.txt"))
     asyncio.run(src.execute("cat /m/a.txt"))
-    expected_commands = [e.command for e in src.history.entries()]
+    expected_commands = [e["command"] for e in asyncio.run(src.history())]
     assert len(expected_commands) == 3
 
     snap = tmp_path / "ws.tar"
     asyncio.run(src.snapshot(snap))
-    dst = Workspace.load(snap)
+    dst = _load(snap)
 
-    got_commands = [e.command for e in dst.history.entries()]
+    got_commands = [e["command"] for e in asyncio.run(dst.history())]
     assert got_commands == expected_commands
 
 
@@ -191,7 +194,7 @@ def test_finished_jobs_survive(tmp_path):
 
     snap = tmp_path / "ws.tar"
     asyncio.run(src.snapshot(snap))
-    dst = Workspace.load(snap)
+    dst = _load(snap)
 
     job_ids = {j.id for j in dst.job_table.list_jobs()}
     assert 1 in job_ids
@@ -277,7 +280,7 @@ def test_workspace_save_load_s3_mounted(tmp_path):
         assert b"OLD-SECRET-OBVIOUS" not in raw
         assert b"<REDACTED>" in raw
 
-        dst = Workspace.load(snap, resources={"/s3": S3Resource(cfg_dst)})
+        dst = _load(snap, resources={"/s3": S3Resource(cfg_dst)})
         # New mount uses fresh creds, fresh bucket
         assert dst.mount("/s3").resource.config.bucket == "dst-bkt"
 
@@ -304,7 +307,7 @@ def test_override_drops_saved_index(tmp_path):
         asyncio.run(src.snapshot(snap))
 
         fresh = S3Resource(cfg)
-        dst = Workspace.load(snap, resources={"/s3": fresh})
+        dst = _load(snap, resources={"/s3": fresh})
         # The mounted resource IS the user-supplied fresh one,
         # carrying its own (empty) index — not anything from the snapshot.
         assert dst.mount("/s3").resource is fresh

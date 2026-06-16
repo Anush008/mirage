@@ -42,7 +42,7 @@ async def test_to_tree_inputs_ram_files():
     await ws.execute("echo hello > /m/a.txt")
     await ws.execute("mkdir -p /m/sub && echo world > /m/sub/b.txt")
 
-    entries, meta = to_tree_inputs(ws)
+    entries, meta = await to_tree_inputs(ws)
 
     assert entries["m/a.txt"] == b"hello\n"
     assert entries["m/sub/b.txt"] == b"world\n"
@@ -58,8 +58,8 @@ async def test_to_state_round_trips_files():
     await ws.execute("echo hello > /m/a.txt")
     await ws.execute("mkdir -p /m/sub && echo world > /m/sub/b.txt")
 
-    original_files = _mount_files(to_state_dict(ws), "/m/")
-    entries, meta = to_tree_inputs(ws)
+    original_files = _mount_files(await to_state_dict(ws), "/m/")
+    entries, meta = await to_tree_inputs(ws)
     state = to_state(entries, meta)
 
     assert _mount_files(state, "/m/") == original_files
@@ -71,8 +71,8 @@ async def test_tree_inputs_from_state_matches_ws_path():
                    mode=MountMode.WRITE)
     await ws.execute("echo hi > /m/a.txt")
 
-    entries_ws, _ = to_tree_inputs(ws)
-    entries_state, _ = tree_inputs_from_state(to_state_dict(ws))
+    entries_ws, _ = await to_tree_inputs(ws)
+    entries_state, _ = tree_inputs_from_state(await to_state_dict(ws))
 
     assert entries_ws == entries_state
     assert entries_state["m/a.txt"] == b"hi\n"
@@ -84,7 +84,7 @@ async def test_to_state_is_tar_loadable():
                    mode=MountMode.WRITE)
     await ws.execute("echo hello > /m/a.txt")
 
-    entries, meta = to_tree_inputs(ws)
+    entries, meta = await to_tree_inputs(ws)
     state = to_state(entries, meta)
 
     manifest, blobs = split_manifest_and_blobs(state)
@@ -101,7 +101,7 @@ async def test_cache_fingerprints_sessions_round_trip():
     ws = Workspace({"/": (RAMResource(), MountMode.WRITE)},
                    mode=MountMode.WRITE)
     await ws.execute("echo hi > /a.txt")
-    state = to_state_dict(ws)
+    state = await to_state_dict(ws)
     state[StateKey.CACHE][CacheKey.ENTRIES] = [{
         CacheKey.KEY: "/a.txt",
         CacheKey.DATA: b"cached-bytes",
@@ -146,7 +146,7 @@ async def test_cache_and_pins_survive_tar():
     ws = Workspace({"/": (RAMResource(), MountMode.WRITE)},
                    mode=MountMode.WRITE)
     await ws.execute("echo hi > /a.txt")
-    state = to_state_dict(ws)
+    state = await to_state_dict(ws)
     state[StateKey.CACHE][CacheKey.ENTRIES] = [{
         CacheKey.KEY: "/a.txt",
         CacheKey.DATA: b"cached-bytes",

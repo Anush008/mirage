@@ -136,14 +136,13 @@ async def main():
     print(f"s3 grep -c queue-operation: {(await r1.stdout_str()).strip()}")
     print(f"gdrive grep -c queue-operation: {(await r2.stdout_str()).strip()}")
 
-    # ── session observer ──
-    print("\n=== SESSION OBSERVER ===\n")
+    # ── bash history ──
+    print("\n=== BASH HISTORY ===\n")
 
     print(f"Total ops: {ops_summary()}")
-    print(f"Commands recorded: {len(ws.history.entries())}")
+    print(f"Commands recorded: {len(await ws.history())}")
 
-    from mirage.utils.dates import utc_date_folder
-    r = await ws.execute(f"head -n 5 /.sessions/{utc_date_folder()}/*.jsonl")
+    r = await ws.execute("tail -n 6 /.bash_history")
     for line in (await r.stdout_str()).strip().splitlines():
         print(f"  {line[:120]}")
 

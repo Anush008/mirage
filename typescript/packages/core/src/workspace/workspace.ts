@@ -19,14 +19,15 @@ import { RAMFileCacheStore } from '../cache/file/ram.ts'
 import type { ByteSource } from '../io/types.ts'
 import { IOResult, materialize } from '../io/types.ts'
 import { runWithRecording, runWithRevisions } from '../observe/context.ts'
-import { Observer } from '../observe/observer.ts'
+import { type EventDict, Observer } from '../observe/observer.ts'
 import type { OpRecord } from '../observe/record.ts'
+import type { ObserverStore } from '../observe/store.ts'
 import { type OpKwargs, OpsRegistry } from '../ops/registry.ts'
 import { assertMountAllowed, runWithSession } from '../runtime/session_context.ts'
 import type { Resource } from '../resource/base.ts'
-import { RAMResource } from '../resource/ram/ram.ts'
+import { HISTORY_PREFIX, HistoryViewResource } from '../resource/history/history.ts'
 import { resourceStateRequiresOverride } from '../resource/secrets.ts'
-import { GENERAL_COMMANDS, HISTORY_COMMANDS } from '../commands/builtin/general/index.ts'
+import { GENERAL_COMMANDS } from '../commands/builtin/general/index.ts'
 import {
   applyOpSafeguard,
   CommandTimeoutError,
@@ -68,8 +69,7 @@ import { runCommandTree } from './node/run_tree.ts'
 import { buildFilePrompt } from './file_prompt.ts'
 import { SessionManager } from './session/manager.ts'
 import type { Session } from './session/session.ts'
-import { ExecutionHistory } from './history.ts'
-import { ExecutionNode, ExecutionRecord } from './types.ts'
+import type { ExecutionNode } from './types.ts'
 import { errorVirtualPath, gnuStrerror } from '../utils/errors.ts'
 import { stripSlash } from '../utils/slash.ts'
 
@@ -97,12 +97,10 @@ export interface WorkspaceOptions {
   shellParserFactory?: () => Promise<ShellParser>
   agentId?: string
   sessionId?: string
-  historyLimit?: number
   cacheLimit?: string | number
   cache?: FileCache & Resource
   index?: IndexConfig
-  observerResource?: Resource
-  observerPrefix?: string
+  observe?: ObserverStore
   python?: {
     autoLoadFromImports?: boolean
     bootstrapCode?: string
@@ -143,10 +141,15 @@ export interface ExecuteOptions {
    * `DOMException('execute aborted', 'AbortError')`.
    */
   signal?: AbortSignal
-  // When true, do not record this execution in history. Useful for
-  // implicit/utility commands the UI runs (e.g. `stat` for an `open` action)
-  // that shouldn't pollute the user's command history.
-  noHistory?: boolean
+  /**
+   * When false, run without logging a history entry or opening a
+   * recording context; ops emitted by the command flow into the
+   * caller's recorder. Used by the executor's internal evaluations
+   * ($(), eval, source, xargs) and available to SDK callers that need
+   * an unrecorded run. Mirrors GNU: history is appended where the typed
+   * line is read, never inside the evaluator.
+   */
+  record?: boolean
   /**
    * Per-call working directory. Providing this runs the command in an
    * isolated session, like a bash subshell `(cd <cwd> && cmd)`. Mutations
@@ -179,7 +182,6 @@ export class Workspace {
   readonly agentId: string
   readonly cache: FileCache & Resource
   private readonly dispatcher: Dispatcher
-  readonly history: ExecutionHistory
   readonly observer: Observer
   readonly records: OpRecord[] = []
   readonly fs: WorkspaceFS
@@ -210,13 +212,8 @@ export class Workspace {
   }
 
   constructor(resources: Record<string, Resource>, options: WorkspaceOptions = {}) {
-    const observerResource: Resource = options.observerResource ?? new RAMResource()
-    const observerPrefix = options.observerPrefix ?? '/.sessions'
-    this.observer = new Observer(observerResource, observerPrefix)
-    const withObserver = { ...resources, [observerPrefix]: observerResource }
-    this.registry = new MountRegistry(withObserver, options.mode ?? MountMode.READ, {
+    this.registry = new MountRegistry(resources, options.mode ?? MountMode.READ, {
       ...(options.modeOverrides ?? {}),
-      [observerPrefix]: MountMode.READ,
     })
     const consistency = options.consistency ?? ConsistencyPolicy.LAZY
     this.registry.setConsistency(consistency)
@@ -236,9 +233,8 @@ export class Workspace {
       workspaceBridge: this.buildWorkspaceBridge(),
     })
     this.closers.push(() => this.pythonRuntime.close())
-    this.history = new ExecutionHistory(
-      options.historyLimit !== undefined ? { maxEntries: options.historyLimit } : {},
-    )
+    this.observer = new Observer(options.observe)
+    this.registry.mount(HISTORY_PREFIX, new HistoryViewResource(this.observer), MountMode.READ)
     this.cache = options.cache ?? new RAMFileCacheStore({ limit: options.cacheLimit ?? '512MB' })
     this.dispatcher = new Dispatcher(
       this.registry,
@@ -248,7 +244,7 @@ export class Workspace {
       consistency,
     )
     const defaultMount = this.registry.setDefaultMount(this.cache)
-    for (const resource of [...Object.values(withObserver), this.cache]) {
+    for (const resource of [...this.registry.allMounts().map((m) => m.resource), this.cache]) {
       const resourceOps = resource.ops?.()
       if (resourceOps === undefined) continue
       for (const op of resourceOps) {
@@ -267,9 +263,6 @@ export class Workspace {
       for (const cmd of GENERAL_COMMANDS) {
         mount.registerGeneral(cmd)
       }
-      for (const cmd of HISTORY_COMMANDS) {
-        mount.registerGeneral(cmd)
-      }
     }
     for (const [prefix, safeguards] of Object.entries(options.commandSafeguards ?? {})) {
       const mount = this.registry.mountForPrefix(prefix)
@@ -282,9 +275,17 @@ export class Workspace {
     }
     this.fs = new WorkspaceFS((path) => this.resolve(path), this.opsRegistry)
     for (const m of this.registry.allMounts()) {
-      if (m.prefix === observerPrefix || m.prefix === '/.sessions/') continue
+      if (m.prefix === HISTORY_PREFIX || m.prefix === HISTORY_PREFIX + '/') continue
       void this.forwardAddMountToPython(m.prefix)
     }
+  }
+
+  /**
+   * Command events recorded by the hidden recorder, across all sessions
+   * in timestamp order.
+   */
+  history(): Promise<EventDict[]> {
+    return this.observer.commandEvents()
   }
 
   private buildWorkspaceBridge(): BridgeDispatchFn {
@@ -366,15 +367,14 @@ export class Workspace {
    * Mount prefixes a session is always allowed to touch.
    *
    * The cache mount (where text-processing commands like `wc` without a
-   * path argument resolve), the device mount, and the observer log are
+   * path argument resolve), the device mount, and the history view are
    * infrastructure: they hold no user credentials, and rejecting them
-   * would break common shell idioms or audit logging.
+   * would break common shell idioms or the history builtin.
    */
   private infrastructureMountPrefixes(): Set<string> {
-    const prefixes = new Set<string>(['/dev'])
+    const prefixes = new Set<string>(['/dev', HISTORY_PREFIX])
     const def = this.registry.defaultMount
     if (def !== null) prefixes.add('/' + stripSlash(def.prefix))
-    prefixes.add('/' + stripSlash(this.observer.prefix))
     return prefixes
   }
 
@@ -432,7 +432,7 @@ export class Workspace {
   /**
    * Remove a mount by prefix. Closes the resource if the workspace had opened
    * it and no other mount still references it. Drops cache entries under the
-   * unmounted prefix. Forbidden prefixes: cache root, observer prefix, /dev/.
+   * unmounted prefix. Forbidden prefixes: cache root, history view, /dev/.
    * In-flight ops that already resolved their Mount are not interrupted.
    */
   async unmount(prefix: string): Promise<void> {
@@ -445,10 +445,8 @@ export class Workspace {
     if (norm === '/dev/') {
       throw new Error(`cannot unmount reserved prefix: /dev/`)
     }
-    const observerStripped = stripSlash(this.observer.prefix)
-    const observerNorm = observerStripped ? `/${observerStripped}/` : '/'
-    if (norm === observerNorm) {
-      throw new Error(`cannot unmount observer prefix: ${this.observer.prefix}`)
+    if (norm === HISTORY_PREFIX + '/') {
+      throw new Error(`cannot unmount history view: ${HISTORY_PREFIX}`)
     }
     const removed = this.registry.unmount(prefix)
     try {
@@ -714,7 +712,11 @@ export class Workspace {
     const dispatch: DispatchFn = this.dispatcher.dispatch
 
     const executeFn: ExecuteFn = async (cmd) => {
-      const innerOpts: ExecuteOptions & { provision?: false } = {}
+      // The executor's internal evals ($(), eval, source, xargs) are
+      // never a typed line: they must not record a history entry or open
+      // their own recording context, so their ops flow into this line's
+      // recorder (GNU: history is appended by the line reader).
+      const innerOpts: ExecuteOptions & { provision?: false } = { record: false }
       if (options.signal !== undefined) innerOpts.signal = options.signal
       const res = await this.execute(cmd, innerOpts)
       return new IOResult({
@@ -745,7 +747,6 @@ export class Workspace {
       ensureOpen,
       unmount: (prefix: string) => this.unmount(prefix),
       pythonRuntime: this.pythonRuntime,
-      history: this.history,
       ...(options.signal !== undefined ? { signal: options.signal } : {}),
     }
     const targetSessionId = options.sessionId ?? this.sessionManager.defaultId
@@ -757,13 +758,18 @@ export class Workspace {
           ...(options.env !== undefined ? { env: { ...targetSession.env, ...options.env } } : {}),
         })
       : targetSession
+    // The line-reader decision (GNU: history is appended where the typed
+    // line is read, never inside the evaluator). Internal evaluations run
+    // with record:false: no new recording scope, so their ops land in the
+    // caller's recorder, and no command entry is logged for them.
+    const isLine = options.record !== false
+    const runBody = (): Promise<[ByteSource | null, IOResult, ExecutionNode]> =>
+      runWithSession(effectiveSession, () =>
+        runCommandTree(deps, rootNode, effectiveSession, stdin),
+      )
     let execResult: [[ByteSource | null, IOResult, ExecutionNode], OpRecord[]]
     try {
-      execResult = await runWithRecording(() =>
-        runWithSession(effectiveSession, () =>
-          runCommandTree(deps, rootNode, effectiveSession, stdin),
-        ),
-      )
+      execResult = isLine ? await runWithRecording(runBody) : [await runBody(), []]
     } catch (err) {
       if (err instanceof CommandTimeoutError) {
         const msg = new TextEncoder().encode(`${err.message}\n`)
@@ -797,25 +803,23 @@ export class Workspace {
     }
     const stderrBytes = await materialize(io.stderr)
 
+    // One rule on every path: an op that happened is always accounted, in
+    // byte accounting (which feeds snapshot fingerprints/drift) and as
+    // observer op events. The command event's exit_code says whether the
+    // line that emitted them succeeded. Internal evals (record:false) have
+    // an empty opRecords here: their ops were accounted by the line above.
     this.records.push(...opRecords)
-    const sessionId = targetSession.sessionId
-    const sessionCwd = effectiveSession.cwd
-    for (const rec of opRecords) {
-      await this.observer.logOp(rec, callAgentId, sessionId, sessionCwd)
+    if (isLine) {
+      io.stdout = stdoutBytes
+      await this.observer.logExecution(
+        command,
+        io,
+        opRecords,
+        callAgentId,
+        targetSession.sessionId,
+        effectiveSession.cwd,
+      )
     }
-    const record = new ExecutionRecord({
-      agent: callAgentId,
-      command,
-      stdout: stdoutBytes,
-      exitCode: io.exitCode,
-      tree: new ExecutionNode({ command, exitCode: io.exitCode }),
-      timestamp: Date.now() / 1000,
-      sessionId,
-    })
-    if (options.noHistory !== true) {
-      await this.history.append(record)
-    }
-    await this.observer.logCommand(record, sessionCwd)
 
     return new ExecuteResult(stdoutBytes, stderrBytes, io.exitCode)
   }

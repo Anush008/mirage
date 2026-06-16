@@ -158,6 +158,11 @@ jobs:
           ./python/.venv/bin/python integ/safeguard.py > /tmp/safeguard.out
           diff integ/truth_safeguard.txt /tmp/safeguard.out
 
+      - name: Run History scenarios and diff against truth
+        run: |
+          ./python/.venv/bin/python integ/history.py > /tmp/history.out
+          diff integ/truth_history.txt /tmp/history.out
+
       - name: Run s3 + gcs + minio integ (moto) and diff against truth
         run: |
           ./python/.venv/bin/python integ/s3.py > /tmp/s3.out

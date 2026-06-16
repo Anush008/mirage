@@ -128,15 +128,18 @@ mirage execute  --workspace_id demo --command "cat /s3/data/example.jsonl > /dev
 mirage provision --workspace_id demo --command "cat /s3/data/example.jsonl"
 ```
 
-### 7. Session traces
+### 7. Command history
 
-Every session writes a JSONL trace under `/.sessions/<utc-yyyy-mm-dd>/`.
+Every executed command is recorded by a hidden recorder (the
+[Observer](/home/observer)). The `history` builtin shows the calling
+session's commands (GNU bash semantics, `history -c` clears only that
+session's view), and `/.bash_history` renders the GNU histfile across all
+sessions, readable with the ordinary file commands.
 
 ```bash
-mirage execute --workspace_id demo --command "ls /.sessions/"
-DAY=$(date -u +%Y-%m-%d)
-mirage execute --workspace_id demo --command "head -n 1 /.sessions/$DAY/*.jsonl" \
-  | jq -r .stdout | jq
+mirage execute --workspace_id demo --command "history 5"
+mirage execute --workspace_id demo --command "tail -n 6 /.bash_history"
+mirage execute --workspace_id demo --command "grep cat /.bash_history"
 ```
 
 ### 8. Background jobs

@@ -12,7 +12,6 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-import type { CommandHistory } from '../../commands/config.ts'
 import { asyncChain } from '../../io/stream.ts'
 import { type ByteSource, IOResult } from '../../io/types.ts'
 import type { Resource } from '../../resource/base.ts'
@@ -86,7 +85,6 @@ export interface ExecuteNodeDeps {
   ensureOpen?: (resource: Resource) => Promise<void>
   unmount?: (prefix: string) => Promise<void>
   pythonRuntime?: PyodideRuntime
-  history?: CommandHistory
   signal?: AbortSignal
 }
 
@@ -133,7 +131,6 @@ export async function executeNode(
       deps.ensureOpen,
       deps.unmount,
       deps.pythonRuntime,
-      deps.history,
       deps.signal,
     )
   }

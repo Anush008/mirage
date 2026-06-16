@@ -68,17 +68,12 @@ async def main() -> None:
                 f"  nonexistent: {vos.path.exists('/gsheets/owned/nope.json')}"
             )
 
-        print("\n--- session observer ---")
-        day_folders = vos.listdir("/.sessions")
-        log_entries = vos.listdir(day_folders[0]) if day_folders else []
-        for e in log_entries:
-            print(f"  {e}")
-        if log_entries:
-            with open(log_entries[0]) as f:
-                for i, line in enumerate(f):
-                    if i >= 3:
-                        break
-                    print(f"  [{i}] {line.strip()[:120]}")
+        print("\n--- bash history ---")
+        with open("/.bash_history") as f:
+            for i, line in enumerate(f):
+                if i >= 6:
+                    break
+                print(f"  {line.rstrip()[:120]}")
 
         records = ws.ops.records
         total = sum(r.bytes for r in records)

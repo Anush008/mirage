@@ -15,7 +15,6 @@
 from dataclasses import asdict, dataclass, field
 
 from mirage.observe import OpRecord
-from mirage.types import DEFAULT_SESSION_ID
 
 
 @dataclass
@@ -51,41 +50,3 @@ class ExecutionNode:
         if self.records:
             d["records"] = [asdict(r) for r in self.records]
         return d
-
-
-@dataclass
-class ExecutionRecord:
-    """One history entry produced by each ws.execute() call.
-
-    Args:
-        agent (str): Identifier for who ran the command.
-        command (str): The raw command string.
-        stdout (bytes): Final output.
-        stdin (bytes | None): Input fed to the first stage, if any.
-        exit_code (int): Top-level exit code.
-        tree (ExecutionNode): Structured execution tree.
-        timestamp (float): When the command was executed.
-        session_id (str): Session that ran the command.
-    """
-
-    agent: str
-    command: str
-    stdout: bytes
-    stdin: bytes | None
-    exit_code: int
-    tree: ExecutionNode
-    timestamp: float
-    session_id: str = DEFAULT_SESSION_ID
-
-    def to_dict(self) -> dict:
-        return {
-            "agent": self.agent,
-            "command": self.command,
-            "stdout": self.stdout.decode(errors="replace"),
-            "stdin":
-            self.stdin.decode(errors="replace") if self.stdin else None,
-            "exit_code": self.exit_code,
-            "tree": self.tree.to_dict(),
-            "timestamp": self.timestamp,
-            "session_id": self.session_id,
-        }

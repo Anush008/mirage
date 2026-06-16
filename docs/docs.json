@@ -74,6 +74,7 @@
               "home/resource-matrix",
               "home/cache",
               "home/snapshot",
+              "home/observer",
               "home/auth"
             ]
           },

@@ -110,11 +110,11 @@ async def test_diff_live_vs_ref_reports_changes_against_version(tmp_path):
     await ws.execute("echo two > /m/a.txt")
     await ws.execute("echo new > /m/b.txt")
 
-    by_oid = await diff_live_vs_ref(store, to_state_dict(ws), c1)
+    by_oid = await diff_live_vs_ref(store, await to_state_dict(ws), c1)
     assert by_oid["modified"] == ["m/a.txt"]
     assert by_oid["added"] == ["m/b.txt"]
 
-    by_branch = await diff_live_vs_ref(store, to_state_dict(ws), "main")
+    by_branch = await diff_live_vs_ref(store, await to_state_dict(ws), "main")
     assert by_branch == by_oid
 
 
@@ -138,11 +138,11 @@ async def test_diff_ignores_cache_churn(tmp_path):
     store = await VersionStore.open(LocalBackend(tmp_path), "ws")
     await ws.execute("echo one > /m/a.txt")
 
-    s1 = to_state_dict(ws)
+    s1 = await to_state_dict(ws)
     s1[StateKey.CACHE][CacheKey.ENTRIES] = [_cache_entry(b"AAA")]
     c1 = await commit_state(store, s1, message="first")
 
-    s2 = to_state_dict(ws)
+    s2 = await to_state_dict(ws)
     s2[StateKey.CACHE][CacheKey.ENTRIES] = [_cache_entry(b"BBB")]
     c2 = await commit_state(store, s2, message="second")
 
@@ -162,7 +162,7 @@ async def test_status_state_reports_uncommitted_changes(tmp_path):
     await commit(store, ws, message="first")
     await ws.execute("echo changed > /m/a.txt")
 
-    st = await status_state(store, to_state_dict(ws), "main")
+    st = await status_state(store, await to_state_dict(ws), "main")
     assert st["modified"] == ["m/a.txt"]
 
 
@@ -173,7 +173,7 @@ async def test_status_state_no_commit_yet_lists_all_as_added(tmp_path):
     store = await VersionStore.open(LocalBackend(tmp_path), "ws")
     await ws.execute("echo one > /m/a.txt")
 
-    st = await status_state(store, to_state_dict(ws), "main")
+    st = await status_state(store, await to_state_dict(ws), "main")
     assert st == {"added": ["m/a.txt"], "modified": [], "deleted": []}
 
 
@@ -184,11 +184,11 @@ async def test_status_ignores_cache_churn(tmp_path):
     store = await VersionStore.open(LocalBackend(tmp_path), "ws")
     await ws.execute("echo one > /m/a.txt")
 
-    s1 = to_state_dict(ws)
+    s1 = await to_state_dict(ws)
     s1[StateKey.CACHE][CacheKey.ENTRIES] = [_cache_entry(b"AAA")]
     await commit_state(store, s1, message="first")
 
-    live = to_state_dict(ws)
+    live = await to_state_dict(ws)
     live[StateKey.CACHE][CacheKey.ENTRIES] = [_cache_entry(b"BBB")]
     st = await status_state(store, live, "main")
 
@@ -216,7 +216,7 @@ async def test_commit_state_creates_version_from_state(tmp_path):
     await ws.execute("echo hi > /m/a.txt")
 
     version = await commit_state(store,
-                                 to_state_dict(ws),
+                                 await to_state_dict(ws),
                                  branch="main",
                                  message="from state")
 

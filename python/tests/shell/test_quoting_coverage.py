@@ -40,10 +40,7 @@ def _ws_with_paths():
     ram._store.files["/数据/中文.txt"] = b"unicode path content\n"
     ram._store.dirs.add("/my folder")
     ram._store.dirs.add("/数据")
-    ws = Workspace(
-        resources={"/data/": (ram, MountMode.WRITE)},
-        history=None,
-    )
+    ws = Workspace(resources={"/data/": (ram, MountMode.WRITE)}, )
     ws.get_session(DEFAULT_SESSION_ID).cwd = "/data"
     return ws
 

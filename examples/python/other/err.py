@@ -138,29 +138,14 @@ async def main():
     io = await ws.execute("grep ERROR /data/logs/app.log | sort | head -n 1")
     await log_result("grep ERROR /data/logs/app.log | sort | head -n 1", io)
 
-    # ── execution history with stderr attribution ────────────────────────
+    # ── execution history: exit codes per command ─────────────────────
     print(f"\n{'═' * 60}")
-    print(" Execution History — stderr attribution")
+    print(" Execution History")
     print(f"{'═' * 60}")
 
-    for entry in ws.history.entries()[-6:]:
-        tree = entry.tree
-        stderr_bytes = tree.stderr if tree.stderr else b""
-        stderr_str = stderr_bytes.decode(errors="replace").strip()
-        print(f"\n  $ {entry.command}")
-        print(f"    exit={entry.exit_code}", end="")
-        if stderr_str:
-            print(f"  stderr={stderr_str!r}", end="")
-        print()
-        if tree.children:
-            for child in tree.children:
-                child_stderr = (child.stderr
-                                or b"").decode(errors="replace").strip()
-                label = child.command or f"({child.op})"
-                parts = [f"      {label}  exit={child.exit_code}"]
-                if child_stderr:
-                    parts.append(f"stderr={child_stderr!r}")
-                print("  ".join(parts))
+    for entry in (await ws.history())[-6:]:
+        print(f"\n  $ {entry['command']}")
+        print(f"    exit={entry['exit_code']}")
 
 
 asyncio.run(main())
