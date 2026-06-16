@@ -57,6 +57,69 @@ def resolve_path(path: str, cwd: str) -> str:
     return posixpath.normpath(path)
 
 
+def expand_tilde(word: str, home: str) -> str:
+    """Expand a leading ``~`` against the home directory.
+
+    ``~`` alone or ``~/rest`` expands to ``home`` (or ``home/rest``).
+    ``~user`` and any non-leading ``~`` are left unchanged, matching
+    bash behavior when no matching user exists.
+
+    Args:
+        word: The unexpanded word.
+        home: The home directory to substitute for ``~``.
+
+    Returns:
+        The word with a leading ``~`` resolved, or the word unchanged.
+    """
+    if word == "~":
+        return home
+    if word.startswith("~/"):
+        return home.rstrip("/") + word[1:]
+    return word
+
+
+def rebase_display(paths: list[str], original: str,
+                   display: str | None) -> list[str]:
+    """Rewrite the base of walked output paths to the as-typed form.
+
+    Used by walkers like ``find``: results are absolute (start path plus
+    subpath), but when the start path was typed relatively the output
+    should show it that way (``find .`` -> ``./sub/x``, not ``/data/sub/x``).
+
+    Args:
+        paths: Absolute result paths produced by walking ``original``.
+        original: The resolved absolute start path.
+        display: The as-typed start path, or ``None`` to leave paths as-is.
+
+    Returns:
+        Paths with the ``original`` base replaced by ``display``.
+    """
+    if display is None or display == original:
+        return paths
+    return [rebase_one(p, original, display) for p in paths]
+
+
+def rebase_one(path: str, original: str, display: str | None) -> str:
+    """Rewrite a single path's ``original`` base to the as-typed ``display``.
+
+    Args:
+        path: An absolute path at or under ``original``.
+        original: The resolved absolute base (traversal root).
+        display: The as-typed base, or ``None``/equal to leave ``path`` as-is.
+
+    Returns:
+        ``path`` with its ``original`` base replaced by ``display``.
+    """
+    if display is None or display == original:
+        return path
+    base = original.rstrip("/")
+    if path == base:
+        return display
+    if path.startswith(base + "/"):
+        return display.rstrip("/") + path[len(base):]
+    return path
+
+
 def gnu_basename(path: str, suffix: str | None = None) -> str:
     i = len(path)
     while i > 0 and path[i - 1] == "/":

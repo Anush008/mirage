@@ -218,6 +218,7 @@ export interface PathSpecInit {
   pattern?: string | null
   resolved?: boolean
   prefix?: string
+  asTyped?: string | null
 }
 
 export class PathSpec {
@@ -226,6 +227,7 @@ export class PathSpec {
   readonly pattern: string | null
   readonly resolved: boolean
   readonly prefix: string
+  readonly asTyped: string | null
 
   constructor(init: PathSpecInit) {
     this.original = init.original
@@ -233,7 +235,15 @@ export class PathSpec {
     this.pattern = init.pattern ?? null
     this.resolved = init.resolved ?? true
     this.prefix = init.prefix ?? ''
+    this.asTyped = init.asTyped ?? null
     Object.freeze(this)
+  }
+
+  // The path as the user typed it, for rendering in output. Falls back to
+  // `original` (the resolved absolute path) when no as-typed form was
+  // recorded, e.g. for absolute arguments.
+  get display(): string {
+    return this.asTyped ?? this.original
   }
 
   get stripPrefix(): string {

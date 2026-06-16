@@ -252,6 +252,8 @@ a.txt
 /data/a.txt
 /data/b.txt
 /data/c.txt
+/data/disptree/d/y.txt
+/data/disptree/x.txt
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
@@ -282,6 +284,8 @@ a.txt
 /data/chat.jsonl
 /data/csv.csv
 /data/data.jsonl
+/data/disptree/d/y.txt
+/data/disptree/x.txt
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
@@ -314,6 +318,7 @@ c.txt
 chat.jsonl
 csv.csv
 data.jsonl
+disptree
 dup.txt
 empty.txt
 fields.txt
@@ -344,6 +349,7 @@ c.txt
 chat.jsonl
 csv.csv
 data.jsonl
+disptree
 dup.txt
 empty.txt
 fields.txt
@@ -454,6 +460,8 @@ baz
 /data/chat.jsonl
 /data/csv.csv
 /data/data.jsonl
+/data/disptree/d/y.txt
+/data/disptree/x.txt
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
@@ -509,6 +517,8 @@ baz
 /data/a.txt
 /data/b.txt
 /data/c.txt
+/data/disptree/d/y.txt
+/data/disptree/x.txt
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
@@ -578,7 +588,7 @@ world
       2 b
       1 c
 === find_pipe_wc ===
-24
+26
 === jq_pipe_wc ===
 3
 === cat_tr_sort ===
@@ -652,6 +662,8 @@ world
 === rg_c ===
 1
 === find_d ===
+/data/disptree
+/data/disptree/d
 /data/guard
 /data/guard/sub
 /data/sub
@@ -660,6 +672,8 @@ world
 /data/a.txt
 /data/b.txt
 /data/c.txt
+/data/disptree/d/y.txt
+/data/disptree/x.txt
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
@@ -689,6 +703,9 @@ world
 /data/chat.jsonl
 /data/csv.csv
 /data/data.jsonl
+/data/disptree
+/data/disptree/d
+/data/disptree/x.txt
 /data/dup.txt
 /data/fields.txt
 /data/guard
@@ -714,6 +731,8 @@ world
 /data/a.txt
 /data/b.txt
 /data/c.txt
+/data/disptree/d/y.txt
+/data/disptree/x.txt
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
@@ -1030,6 +1049,8 @@ baz,
 /data/chat.jsonl
 /data/csv.csv
 /data/data.jsonl
+/data/disptree
+/data/disptree/d
 /data/guard
 /data/guard/sub
 /data/sub
@@ -1037,6 +1058,9 @@ baz,
 /data/user.json
 /data/users.json
 === find_size_lt ===
+/data/disptree
+/data/disptree/d
+/data/disptree/d/y.txt
 /data/empty.txt
 /data/guard
 /data/guard/sub
@@ -1054,6 +1078,8 @@ baz,
 /data/chat.jsonl
 /data/csv.csv
 /data/data.jsonl
+/data/disptree/d/y.txt
+/data/disptree/x.txt
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
@@ -1086,6 +1112,10 @@ baz,
 /data/chat.jsonl
 /data/csv.csv
 /data/data.jsonl
+/data/disptree
+/data/disptree/d
+/data/disptree/d/y.txt
+/data/disptree/x.txt
 /data/dup.txt
 /data/empty.txt
 /data/fields.txt
@@ -1150,7 +1180,7 @@ baz,
 === du_file ===
 24	/data/a.txt
 === du_dir ===
-628	/data
+648	/data
 === du_h ===
 24B	/data/a.txt
 === tree ===
@@ -1402,6 +1432,118 @@ atroot
 at_root.txt
 === root_create_dirname ===
 /data
+=== cwd_pwd_root ===
+/
+=== cwd_cd_mount_pwd ===
+/data
+=== cwd_cd_subdir_pwd ===
+/data/sub
+=== cwd_cd_dotdot_pwd ===
+/data
+=== cwd_rel_cat ===
+hello
+world
+foo
+bar
+baz
+=== cwd_rel_dot_cat ===
+hello
+world
+foo
+bar
+baz
+=== cwd_rel_subdir_cat ===
+nested
+content
+=== cwd_rel_dotdot_cat ===
+hello
+world
+foo
+bar
+baz
+=== cwd_echo_pwd ===
+/data/sub
+=== cwd_echo_home_default ===
+/
+=== cwd_cd_oldpwd ===
+/data
+=== cwd_cd_dash ===
+/data
+=== cwd_cd_dash_pwd ===
+/data
+=== cwd_home_cd_tilde ===
+/data
+=== cwd_home_echo ===
+/data
+=== cwd_tilde_cat ===
+hello
+world
+foo
+bar
+baz
+=== cwd_tilde_subdir_cat ===
+nested
+content
+=== subshell_var_isolated ===
+1
+=== subshell_var_inherit ===
+7
+=== subshell_export_isolated ===
+[]
+=== subshell_func_redef ===
+A
+=== subshell_func_no_leak ===
+gone
+=== subshell_positional_isolated ===
+3
+=== subshell_positional_inherit ===
+a b
+=== subshell_cd_no_leak ===
+/
+=== subshell_nested_cd ===
+/data
+=== disp_wc_rel ===
+5 a.txt
+=== disp_wc_multi ===
+5 a.txt
+3 b.txt
+8 total
+=== disp_wc_dotslash ===
+5 ./a.txt
+=== disp_wc_dotdot ===
+5 ../a.txt
+=== disp_grep_multi ===
+a.txt:world
+=== disp_md5_rel ===
+191c53e00627438f88824862472a3f59  a.txt
+=== disp_stat_name ===
+a.txt
+=== disp_find_subdir ===
+sub/nested.txt
+=== disp_head_multi ===
+==> a.txt <==
+hello
+
+==> b.txt <==
+1
+=== disp_grep_files ===
+a.txt
+=== disp_grep_r ===
+disptree/x.txt:nested
+=== disp_rg_r ===
+disptree/x.txt:nested
+=== disp_ls_recursive ===
+disptree:
+d
+x.txt
+
+disptree/d:
+y.txt
+=== disp_find_root ===
+disptree
+disptree/d
+disptree/d/y.txt
+disptree/x.txt
 === jq_no_filter_no_input ===
 exit=0
 === jq_dot_no_input ===
@@ -1636,6 +1778,15 @@ cat: /data/sub/missing.txt: No such file or directory
 === nf_cat_pipe ===
 exit=0
 cat: /data/missing.txt: No such file or directory
+=== nf_cat_rel ===
+exit=1
+cat: missing.txt: No such file or directory
+=== nf_cat_rel_subdir ===
+exit=1
+cat: sub/missing.txt: No such file or directory
+=== nf_grep_r_rel ===
+exit=1
+grep: missing: No such file or directory
 === find_bad_maxdepth ===
 exit=1
 find: invalid argument 'abc' to '-maxdepth'
