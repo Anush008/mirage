@@ -414,7 +414,7 @@ describe('parseCommand — clusters ending in a value flag (getopt)', () => {
 
   it('find multi-char short flags still work', () => {
     const p = parseCommand(specOf('find'), ['/data', '-name', '*.txt'], '/')
-    expect(p.flags['-name']).toBe('*.txt')
+    expect(p.flags['-name']).toEqual(['*.txt'])
   })
 })
 

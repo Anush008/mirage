@@ -73,32 +73,6 @@ def _parse_mtime(spec: str) -> tuple[float | None, float | None]:
     return now - (n + 1) * day, now - n * day
 
 
-def _extract_not_name(texts: tuple[str, ...]) -> str | None:
-    for i, t in enumerate(texts):
-        if t == "-not" and i + 2 < len(texts) and texts[i + 1] == "-name":
-            return texts[i + 2]
-    return None
-
-
-def _extract_or_names(
-    name: str | None,
-    texts: tuple[str, ...],
-) -> list[str]:
-    names: list[str] = []
-    if name:
-        names.append(name)
-    i = 0
-    while i < len(texts):
-        if texts[i] in ("-or",
-                        "-o") and i + 2 < len(texts) and texts[i +
-                                                               1] == "-name":
-            names.append(texts[i + 2])
-            i += 3
-        else:
-            i += 1
-    return names
-
-
 def _parse_modified(modified: str | None) -> float | None:
     if modified is None:
         return None

@@ -1,0 +1,133 @@
+import pytest
+
+from mirage.commands.builtin.find_eval import (And, Empty, Name, Not, Or, Path,
+                                               TrueNode, Type, eval_predicate)
+from mirage.commands.builtin.find_parse import (FindParseError,
+                                                parse_find_expression)
+
+
+def test_parse_not_name():
+    expr = parse_find_expression(["-not", "-name", "*.txt"])
+    assert expr.tree == Not(Name("*.txt"))
+
+
+def test_parse_bang_name():
+    expr = parse_find_expression(["!", "-name", "*.txt"])
+    assert expr.tree == Not(Name("*.txt"))
+
+
+def test_parse_or_names():
+    expr = parse_find_expression(["-name", "a", "-o", "-name", "b"])
+    assert expr.tree == Or([Name("a"), Name("b")])
+
+
+def test_parse_implicit_and():
+    expr = parse_find_expression(["-type", "d", "-name", "a"])
+    assert expr.tree == And([Type("d"), Name("a")])
+
+
+def test_parse_explicit_and():
+    expr = parse_find_expression(["-type", "d", "-a", "-not", "-empty"])
+    assert expr.tree == And([Type("d"), Not(Empty())])
+
+
+def test_or_lower_precedence_than_and():
+    expr = parse_find_expression(
+        ["-name", "a", "-o", "-name", "b", "-name", "c"])
+    assert expr.tree == Or([Name("a"), And([Name("b"), Name("c")])])
+
+
+def test_grouping():
+    expr = parse_find_expression(
+        ["(", "-name", "a", "-o", "-name", "b", ")", "-type", "f"])
+    assert expr.tree == And([Or([Name("a"), Name("b")]), Type("f")])
+
+
+def test_iname_path_empty():
+    assert parse_find_expression(["-iname", "*.TXT"]).tree == Name("*.TXT",
+                                                                   icase=True)
+    assert parse_find_expression(["-path", "*/x/*"]).tree == Path("*/x/*")
+    assert parse_find_expression(["-empty"]).tree == Empty()
+
+
+def test_globals_extracted_as_truenode():
+    expr = parse_find_expression(
+        ["-maxdepth", "2", "-mindepth", "1", "-name", "x"])
+    assert expr.maxdepth == 2
+    assert expr.mindepth == 1
+    assert eval_predicate(expr.tree, _ent(name="x.foo")) is False
+    assert eval_predicate(expr.tree, _ent(name="x")) is True
+
+
+def test_size_extracted_global():
+    expr = parse_find_expression(["-size", "+50c"])
+    assert expr.min_size == 50
+    assert expr.max_size is None
+
+
+def test_empty_expression_is_true():
+    assert parse_find_expression([]).tree == TrueNode()
+
+
+def test_unknown_predicate_raises():
+    with pytest.raises(FindParseError):
+        parse_find_expression(["-bogus"])
+    with pytest.raises(FindParseError):
+        parse_find_expression(["-regex", ".*"])
+
+
+def test_unbalanced_paren_raises():
+    with pytest.raises(FindParseError):
+        parse_find_expression(["(", "-name", "a"])
+
+
+@pytest.mark.parametrize("tokens", [
+    ["-maxdepth", "abc"],
+    ["-mindepth", "x"],
+    ["-size", ""],
+    ["-size", "abc"],
+    ["-mtime", ""],
+])
+def test_invalid_numeric_arg_raises_find_parse_error(tokens):
+    with pytest.raises(FindParseError):
+        parse_find_expression(tokens)
+
+
+def _ent(name="a", kind="f"):
+    from mirage.commands.builtin.find_eval import FindEntry
+    return FindEntry(key="/" + name, name=name, kind=kind, depth=1)
+
+
+@pytest.mark.parametrize("tokens", [
+    ["-boguspredicate"],
+    ["-regex", ".*deep.*"],
+    ["-newer", "data/a.txt"],
+    ["-prune"],
+    ["-nam", "*.txt"],
+])
+def test_unsupported_predicate_raises(tokens):
+    with pytest.raises(FindParseError):
+        parse_find_expression(tokens)
+
+
+@pytest.mark.parametrize("ftype", ["b", "c", "d", "p", "f", "l", "s"])
+def test_valid_type_letters_accepted(ftype):
+    assert parse_find_expression(["-type", ftype]).tree == Type(ftype)
+
+
+@pytest.mark.parametrize("ftype", ["x", "z", "dir"])
+def test_invalid_type_letter_raises(ftype):
+    with pytest.raises(FindParseError):
+        parse_find_expression(["-type", ftype])
+
+
+def test_deeply_nested_expression_raises_not_recursion_error():
+    tokens = ["("] * 500 + ["-name", "x"] + [")"] * 500
+    with pytest.raises(FindParseError):
+        parse_find_expression(tokens)
+
+
+def test_deeply_nested_not_raises_not_recursion_error():
+    tokens = ["-not"] * 500 + ["-name", "x"]
+    with pytest.raises(FindParseError):
+        parse_find_expression(tokens)

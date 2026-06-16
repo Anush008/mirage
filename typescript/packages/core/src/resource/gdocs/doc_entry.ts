@@ -12,6 +12,8 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import { stripUnderscores } from '../../utils/sanitize.ts'
+
 const TITLE_MAX_CHARS = 100
 const UNSAFE_CHARS = /[^\w\s\-.]/g
 const MULTI_UNDERSCORE = /_+/g
@@ -32,7 +34,7 @@ export function sanitizeTitle(title: string): string {
   let cleaned = title.replace(UNSAFE_CHARS, '_')
   cleaned = cleaned.replace(/ /g, '_')
   cleaned = cleaned.replace(MULTI_UNDERSCORE, '_')
-  cleaned = cleaned.replace(/^_+|_+$/g, '')
+  cleaned = stripUnderscores(cleaned)
   if (cleaned.length > TITLE_MAX_CHARS) {
     cleaned = cleaned.slice(0, TITLE_MAX_CHARS - 3) + '...'
   }

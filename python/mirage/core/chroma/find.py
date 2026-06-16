@@ -1,10 +1,10 @@
-import fnmatch
-
 from mirage.cache.index import IndexCacheStore
+from mirage.commands.builtin.find_eval import (FindEntry, PredNode, build_tree,
+                                               keep, tree_has_type)
 from mirage.core.chroma.path import resolve_path
 from mirage.core.chroma.stat import stat
 from mirage.core.chroma.walk import walk
-from mirage.types import FindType, PathSpec
+from mirage.types import PathSpec
 
 
 async def find(
@@ -22,6 +22,8 @@ async def find(
     iname: str | None = None,
     path_pattern: str | None = None,
     mindepth: int | None = None,
+    empty: bool = False,
+    tree: PredNode | None = None,
     index: IndexCacheStore | None = None,
 ) -> list[str]:
     if index is None:
@@ -32,12 +34,18 @@ async def find(
                          include_root=True,
                          maxdepth=maxdepth,
                          strip_prefix=True)
+    tree = tree if tree is not None else build_tree(name=name,
+                                                    iname=iname,
+                                                    path_pattern=path_pattern,
+                                                    type=type,
+                                                    name_exclude=name_exclude,
+                                                    or_names=or_names)
+    needs_kind = tree_has_type(tree)
     filtered: list[str] = []
     for item in results:
         if await _matches(accessor, item, path.prefix, index,
-                          path.strip_prefix, name, type, min_size, max_size,
-                          name_exclude, or_names, iname, path_pattern,
-                          mindepth):
+                          path.strip_prefix, tree, needs_kind, min_size,
+                          max_size, mindepth):
             filtered.append(item)
     return sorted(filtered)
 
@@ -48,37 +56,24 @@ async def _matches(
     prefix: str,
     index: IndexCacheStore,
     root: str,
-    name: str | None,
-    type: str | None,
+    tree: PredNode,
+    needs_kind: bool,
     min_size: int | None,
     max_size: int | None,
-    name_exclude: str | None,
-    or_names: list[str] | None,
-    iname: str | None,
-    path_pattern: str | None,
     mindepth: int | None,
 ) -> bool:
     item_name = item.rstrip("/").rsplit("/", 1)[-1]
-    if mindepth is not None and _relative_depth(item, root) < mindepth:
-        return False
-    if name and not fnmatch.fnmatch(item_name, name):
-        return False
-    if iname and not fnmatch.fnmatch(item_name.lower(), iname.lower()):
-        return False
-    if path_pattern and not fnmatch.fnmatch(item, path_pattern):
-        return False
-    if name_exclude and fnmatch.fnmatch(item_name, name_exclude):
-        return False
-    if or_names and not any(
-            fnmatch.fnmatch(item_name, pattern) for pattern in or_names):
-        return False
     spec = PathSpec.from_str_path(item, prefix)
-    if type is not None:
+    kind = "f"
+    if needs_kind:
         resolved = await resolve_path(accessor, spec, index)
-        if type == FindType.FILE and resolved.is_dir:
-            return False
-        if type == FindType.DIRECTORY and not resolved.is_dir:
-            return False
+        kind = "d" if resolved.is_dir else "f"
+    entry = FindEntry(key=item,
+                      name=item_name,
+                      kind=kind,
+                      depth=_relative_depth(item, root))
+    if not keep(entry, tree, mindepth):
+        return False
     if min_size is not None or max_size is not None:
         item_stat = await stat(accessor, spec, index)
         if item_stat.size is None:

@@ -93,7 +93,7 @@ describe('find', () => {
     resource.store.dirs.add('/tmp/sub')
     resource.store.files.set('/tmp/file.txt', ENC.encode('data'))
     const r = await runFind(resource, [PathSpec.fromStrPath('/tmp')], { type: 'd' })
-    expect(r.lines).toEqual(['/tmp/sub'])
+    expect(r.lines).toEqual(['/tmp', '/tmp/sub'])
   })
 
   it('-type f finds only files', async () => {
@@ -113,7 +113,7 @@ describe('find', () => {
     resource.store.files.set('/tmp/small.txt', ENC.encode('hi'))
     resource.store.files.set('/tmp/big.txt', ENC.encode('a'.repeat(100)))
     const r = await runFind(resource, [PathSpec.fromStrPath('/tmp')], { size: '+50c' })
-    expect(r.lines).toEqual(['/tmp/big.txt'])
+    expect(r.lines).toEqual(['/tmp', '/tmp/big.txt'])
   })
 
   it('-size -N filters by max size', async () => {
@@ -122,7 +122,7 @@ describe('find', () => {
     resource.store.files.set('/tmp/small.txt', ENC.encode('hi'))
     resource.store.files.set('/tmp/big.txt', ENC.encode('a'.repeat(100)))
     const r = await runFind(resource, [PathSpec.fromStrPath('/tmp')], { size: '-50c' })
-    expect(r.lines).toEqual(['/tmp/small.txt'])
+    expect(r.lines).toEqual(['/tmp', '/tmp/small.txt'])
   })
 
   it('-maxdepth limits recursion', async () => {
@@ -151,7 +151,56 @@ describe('find', () => {
       '*.pyc',
     ])
     const sorted = r.lines.slice().sort()
-    expect(sorted).toEqual(['/tmp/a.txt', '/tmp/c.txt'])
+    expect(sorted).toEqual(['/tmp', '/tmp/a.txt', '/tmp/c.txt'])
+  })
+
+  it('-empty matches empty files and dirs', async () => {
+    const resource = new RAMResource()
+    resource.store.dirs.add('/tmp')
+    resource.store.dirs.add('/tmp/sub')
+    resource.store.dirs.add('/tmp/emptydir')
+    resource.store.files.set('/tmp/empty.txt', new Uint8Array())
+    resource.store.files.set('/tmp/sub/full.txt', ENC.encode('x'))
+    const r = await runFind(resource, [PathSpec.fromStrPath('/tmp')], { empty: true })
+    expect(r.lines.slice().sort()).toEqual(['/tmp/empty.txt', '/tmp/emptydir'])
+  })
+
+  it('-empty with -type d', async () => {
+    const resource = new RAMResource()
+    resource.store.dirs.add('/tmp')
+    resource.store.dirs.add('/tmp/emptydir')
+    resource.store.files.set('/tmp/a.txt', ENC.encode('x'))
+    const r = await runFind(resource, [PathSpec.fromStrPath('/tmp')], { empty: true, type: 'd' })
+    expect(r.lines.slice().sort()).toEqual(['/tmp/emptydir'])
+  })
+
+  it('-not -name excludes (B3 grammar)', async () => {
+    const resource = new RAMResource()
+    resource.store.dirs.add('/tmp')
+    resource.store.files.set('/tmp/a.txt', ENC.encode('a'))
+    resource.store.files.set('/tmp/b.md', ENC.encode('b'))
+    const r = await runFind(resource, [PathSpec.fromStrPath('/tmp')], {}, [
+      '-not',
+      '-name',
+      '*.txt',
+    ])
+    expect(r.lines.slice().sort()).toEqual(['/tmp', '/tmp/b.md'])
+  })
+
+  it('-name a -o -name b (B3 grammar)', async () => {
+    const resource = new RAMResource()
+    resource.store.dirs.add('/tmp')
+    resource.store.files.set('/tmp/a.txt', ENC.encode('a'))
+    resource.store.files.set('/tmp/b.md', ENC.encode('b'))
+    resource.store.files.set('/tmp/c.rst', ENC.encode('c'))
+    const r = await runFind(resource, [PathSpec.fromStrPath('/tmp')], {}, [
+      '-name',
+      '*.txt',
+      '-o',
+      '-name',
+      '*.md',
+    ])
+    expect(r.lines.slice().sort()).toEqual(['/tmp/a.txt', '/tmp/b.md'])
   })
 
   it('missing path yields no results', async () => {

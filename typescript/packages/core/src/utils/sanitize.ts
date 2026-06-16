@@ -17,7 +17,7 @@ const UNSAFE_CHARS = /[^\p{L}\p{N}_\s\-.]/gu
 const MULTI_UNDERSCORE = /_+/g
 const MAX_LEN = 100
 
-function stripUnderscores(value: string): string {
+export function stripUnderscores(value: string): string {
   let start = 0
   let end = value.length
   while (start < end && value[start] === '_') start += 1

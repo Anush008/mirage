@@ -12,6 +12,9 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Command } from 'commander'
 import { registerDaemonCommands } from './daemon.ts'
 import { registerExecuteCommand } from './execute.ts'
@@ -20,12 +23,29 @@ import { registerProvisionCommand } from './provision.ts'
 import { registerSessionCommands } from './session.ts'
 import { registerWorkspaceCommands } from './workspace.ts'
 
+function resolveVersion(): string {
+  let dir = dirname(fileURLToPath(import.meta.url))
+  for (let i = 0; i < 6; i++) {
+    try {
+      const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
+        name?: string
+        version?: string
+      }
+      if (pkg.name === '@struktoai/mirage-cli' && pkg.version) return pkg.version
+    } catch {
+      // package.json absent at this level: keep walking up to the package root
+    }
+    dir = dirname(dir)
+  }
+  return '0.0.0'
+}
+
 export function buildProgram(): Command {
   const program = new Command()
   program
     .name('mirage')
     .description('Mirage daemon CLI: manage workspaces and execute commands.')
-    .version('0.0.0')
+    .version(resolveVersion())
   registerWorkspaceCommands(program)
   registerSessionCommands(program)
   registerJobCommands(program)

@@ -16,7 +16,13 @@ import type { ChromaAccessor } from '../../accessor/chroma.ts'
 import type { IndexCacheStore } from '../../cache/index/store.ts'
 import type { FindOptions } from '../../resource/base.ts'
 import { PathSpec } from '../../types.ts'
-import { fnmatch } from '../../utils/fnmatch.ts'
+import {
+  buildTree,
+  type FindEntry,
+  keep,
+  type PredNode,
+  treeHasType,
+} from '../../commands/builtin/findEval.ts'
 import { lstripSlash, rstripSlash, stripSlash } from '../../utils/slash.ts'
 import { modifiedTs } from '../generic/find.ts'
 import { resolvePath } from './path.ts'
@@ -45,44 +51,23 @@ async function matches(
   index: IndexCacheStore | undefined,
   root: string,
   options: FindOptions,
+  tree: PredNode,
+  needsKind: boolean,
 ): Promise<boolean> {
   const itemName = rstripSlash(item).split('/').pop() ?? ''
-  if (options.minDepth != null && relativeDepth(item, root) < options.minDepth) return false
-  if (options.name != null && options.name !== '' && !fnmatch(itemName, options.name)) return false
-  if (
-    options.iname != null &&
-    options.iname !== '' &&
-    !fnmatch(itemName.toLowerCase(), options.iname.toLowerCase())
-  ) {
-    return false
-  }
-  if (
-    options.pathPattern != null &&
-    options.pathPattern !== '' &&
-    !fnmatch(item, options.pathPattern)
-  ) {
-    return false
-  }
-  if (
-    options.nameExclude != null &&
-    options.nameExclude !== '' &&
-    fnmatch(itemName, options.nameExclude)
-  ) {
-    return false
-  }
-  if (
-    options.orNames != null &&
-    options.orNames.length > 0 &&
-    !options.orNames.some((pattern) => fnmatch(itemName, pattern))
-  ) {
-    return false
-  }
   const spec = PathSpec.fromStrPath(item, prefix)
-  if (options.type != null) {
+  let kind: 'd' | 'f' = 'f'
+  if (needsKind) {
     const resolved = await resolvePath(accessor, spec, index)
-    if (options.type === 'f' && resolved.isDir) return false
-    if (options.type === 'd' && !resolved.isDir) return false
+    kind = resolved.isDir ? 'd' : 'f'
   }
+  const entry: FindEntry = {
+    key: item,
+    name: itemName,
+    kind,
+    depth: relativeDepth(item, root),
+  }
+  if (!keep(entry, tree, options.minDepth)) return false
   if (options.minSize != null || options.maxSize != null) {
     const itemStat = await stat(accessor, spec, index)
     if (itemStat.size === null) return false
@@ -113,9 +98,22 @@ export async function find(
     maxDepth: options.maxDepth ?? null,
     stripPrefix: true,
   })
+  const tree =
+    options.tree ??
+    buildTree({
+      name: options.name,
+      iname: options.iname,
+      pathPattern: options.pathPattern,
+      type: options.type,
+      nameExclude: options.nameExclude,
+      orNames: options.orNames,
+    })
+  const needsKind = treeHasType(tree)
   const filtered: string[] = []
   for (const item of results) {
-    if (await matches(accessor, item, path.prefix, index, path.stripPrefix, options)) {
+    if (
+      await matches(accessor, item, path.prefix, index, path.stripPrefix, options, tree, needsKind)
+    ) {
       filtered.push(item)
     }
   }

@@ -343,8 +343,8 @@ def test_find_spec():
     parsed = parse_command(spec, ["/data", "-name", "*.py", "-type", "f"],
                            cwd="/")
     assert parsed.paths() == ["/data"]
-    assert parsed.flag("-name") == "*.py"
-    assert parsed.flag("-type") == "f"
+    assert parsed.flag("-name") == ["*.py"]
+    assert parsed.flag("-type") == ["f"]
 
 
 def test_curl_spec():

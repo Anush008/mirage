@@ -15,6 +15,7 @@
 import { isEnoent } from '../../../core/generic/find.ts'
 import { IOResult, type ByteSource } from '../../../io/types.ts'
 import type { FindOptions } from '../../../resource/base.ts'
+import { parseFindExpression } from '../findParse.ts'
 import { PathSpec } from '../../../types.ts'
 import type { CommandFnResult, CommandOpts } from '../../config.ts'
 import { rstripSlash } from '../../../utils/slash.ts'
@@ -131,24 +132,40 @@ export async function findGeneric(
   if (badArg !== null) return invalidFindArg(badArg[0], badArg[1])
   const nameExclude = extractNotName(texts)
   const orNames = extractOrNames(nameFlag, texts)
+  const emptyFlag = opts.flags.empty === true
+  const expr = texts.length > 0 ? parseFindExpression(texts) : null
+  const options: FindOptions =
+    expr !== null
+      ? {
+          tree: expr.tree,
+          ...(expr.maxDepth !== null ? { maxDepth: expr.maxDepth } : {}),
+          ...(expr.minDepth !== null ? { minDepth: expr.minDepth } : {}),
+          ...(expr.minSize !== null ? { minSize: expr.minSize } : {}),
+          ...(expr.maxSize !== null ? { maxSize: expr.maxSize } : {}),
+          ...(expr.mtimeMin !== null ? { mtimeMin: expr.mtimeMin } : {}),
+          ...(expr.mtimeMax !== null ? { mtimeMax: expr.mtimeMax } : {}),
+          ...(expr.usesEmpty ? { empty: true } : {}),
+        }
+      : {
+          name: nameFlag,
+          iname: inameFlag,
+          type: findType,
+          ...(maxDepth !== null ? { maxDepth } : {}),
+          ...(minDepth !== null ? { minDepth } : {}),
+          ...(minSize !== null ? { minSize } : {}),
+          ...(maxSize !== null ? { maxSize } : {}),
+          ...(mtimeMin !== null ? { mtimeMin } : {}),
+          ...(mtimeMax !== null ? { mtimeMax } : {}),
+          ...(nameExclude !== null ? { nameExclude } : {}),
+          ...(pathFlag !== null ? { pathPattern: pathFlag } : {}),
+          ...(orNames.length > 1 ? { orNames } : {}),
+          ...(emptyFlag ? { empty: true } : {}),
+        }
   const matches: string[] = []
   for (const root of targets) {
     let keys: string[]
     try {
-      keys = await find(root, {
-        name: nameFlag,
-        iname: inameFlag,
-        type: findType,
-        ...(maxDepth !== null ? { maxDepth } : {}),
-        ...(minDepth !== null ? { minDepth } : {}),
-        ...(minSize !== null ? { minSize } : {}),
-        ...(maxSize !== null ? { maxSize } : {}),
-        ...(mtimeMin !== null ? { mtimeMin } : {}),
-        ...(mtimeMax !== null ? { mtimeMax } : {}),
-        ...(nameExclude !== null ? { nameExclude } : {}),
-        ...(pathFlag !== null ? { pathPattern: pathFlag } : {}),
-        ...(orNames.length > 1 ? { orNames } : {}),
-      })
+      keys = await find(root, options)
     } catch (err) {
       // GNU find reports missing roots and moves on; anything else
       // (rate limits, auth failures) must surface.

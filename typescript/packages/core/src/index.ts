@@ -1093,6 +1093,14 @@ export { setHttpProxyBase } from './commands/builtin/utils/http.ts'
 
 export { lstripSlash, rstripSlash, stripSlash } from './utils/slash.ts'
 export { fnmatch } from './utils/fnmatch.ts'
+export {
+  buildTree,
+  computeNonemptyDirs,
+  evalPredicate,
+  type FindEntry,
+  keep,
+  type PredNode,
+} from './commands/builtin/findEval.ts'
 export { enoent, enotdir, errorVirtualPath, type FsError, gnuStrerror } from './utils/errors.ts'
 
 export {

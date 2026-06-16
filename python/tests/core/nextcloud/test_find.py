@@ -23,7 +23,7 @@ async def test_find_subdir_scopes_results(make_acc):
         "other.txt": b"o",
     })
     out = await find(acc, PathSpec.from_str_path("/data"))
-    assert out == ["/data/a.json", "/data/sub", "/data/sub/b.json"]
+    assert out == ["/data", "/data/a.json", "/data/sub", "/data/sub/b.json"]
 
 
 @pytest.mark.asyncio

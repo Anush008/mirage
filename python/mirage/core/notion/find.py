@@ -12,10 +12,10 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
-from fnmatch import fnmatch
-
 from mirage.accessor.notion import NotionAccessor
 from mirage.cache.index import IndexCacheStore
+from mirage.commands.builtin.find_eval import (FindEntry, PredNode, build_tree,
+                                               keep)
 from mirage.core.notion.readdir import readdir
 from mirage.core.notion.stat import stat
 from mirage.types import FileStat, FileType, PathSpec
@@ -54,6 +54,8 @@ async def find(
     iname: str | None = None,
     path_pattern: str | None = None,
     mindepth: int | None = None,
+    empty: bool = False,
+    tree: PredNode | None = None,
     index: IndexCacheStore | None = None,
 ) -> list[str]:
     if isinstance(path, str):
@@ -64,33 +66,27 @@ async def find(
     collected: list[tuple[str, FileStat]] = []
     await _collect(accessor, path, index, collected)
     results: list[str] = []
+    tree = tree if tree is not None else build_tree(name=name,
+                                                    iname=iname,
+                                                    path_pattern=path_pattern,
+                                                    type=type,
+                                                    name_exclude=name_exclude,
+                                                    or_names=or_names)
     for entry_path, file_stat in collected:
         rel = entry_path
         if path.prefix and rel.startswith(path.prefix):
             rel = rel[len(path.prefix):] or "/"
         rel = "/" + rel.strip("/") if rel.strip("/") else "/"
         is_dir = file_stat.type == FileType.DIRECTORY
-        if type in ("f", "file") and is_dir:
-            continue
-        if type in ("d", "directory") and not is_dir:
-            continue
         entry_name = rel.rsplit("/", 1)[-1]
-        if or_names:
-            if not any(fnmatch(entry_name, pat) for pat in or_names):
-                continue
-        elif name is not None and not fnmatch(entry_name, name):
-            continue
-        if iname is not None and not fnmatch(entry_name.lower(),
-                                             iname.lower()):
-            continue
-        if path_pattern is not None and not fnmatch(rel, path_pattern):
-            continue
-        if name_exclude is not None and fnmatch(entry_name, name_exclude):
-            continue
         depth = 0 if rel == base else rel.count("/") - base_depth
         if maxdepth is not None and depth > maxdepth:
             continue
-        if mindepth is not None and depth < mindepth:
+        entry = FindEntry(key=rel,
+                          name=entry_name,
+                          kind="d" if is_dir else "f",
+                          depth=depth)
+        if not keep(entry, tree, mindepth):
             continue
         if not is_dir and (min_size is not None or max_size is not None):
             size = file_stat.size or 0

@@ -30,12 +30,23 @@ def _default_paths(paths: list[PathSpec],
     return [PathSpec(original="/", directory="/")]
 
 
+def _is_bare_name(texts: tuple[str, ...]) -> bool:
+    return bool(texts) and not texts[0].startswith("-") and texts[0] not in (
+        "(", ")", "!")
+
+
 def _default_name(name: str | None, texts: tuple[str, ...]) -> str | None:
     if name is not None:
         return name
-    if texts and not texts[0].startswith("-"):
+    if _is_bare_name(texts):
         return texts[0]
     return None
+
+
+def _expr_texts(texts: tuple[str, ...]) -> tuple[str, ...]:
+    if _is_bare_name(texts):
+        return ()
+    return texts
 
 
 async def _normalize_find_output(
@@ -74,7 +85,7 @@ async def find(
     stat_fn = (partial(stat_core, accessor, index=index) if mtime is not None
                else partial(stat_light, accessor, index=index))
     stdout, io = await generic_find(paths,
-                                    texts,
+                                    _expr_texts(texts),
                                     find_core=partial(find_core,
                                                       accessor,
                                                       index=index),

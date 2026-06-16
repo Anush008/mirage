@@ -15,7 +15,9 @@ fail=0
 
 export CROSS_DISK_ROOT="${CROSS_DISK_ROOT:-/tmp/mirage-cross-disk}"
 export CROSS_REDIS_PREFIX="${CROSS_REDIS_PREFIX:-mirage-cross/}"
-mkdir -p "$CROSS_DISK_ROOT"
+export CROSS_SNAPSHOT_ROOT="${CROSS_SNAPSHOT_ROOT:-/tmp/mirage-cross-snap}"
+export MIRAGE_SNAPSHOT_ROOT="$CROSS_SNAPSHOT_ROOT"
+mkdir -p "$CROSS_DISK_ROOT" "$CROSS_SNAPSHOT_ROOT"
 
 FINGERPRINTS=(
   "cat /ram/f.txt"
@@ -69,7 +71,7 @@ check_default_session() {
 
 run_direction() {
   local writer_cli="$1" writer_name="$2" reader_cli="$3" reader_name="$4"
-  local tar="/tmp/cross-${writer_name}-to-${reader_name}.tar"
+  local tar="$CROSS_SNAPSHOT_ROOT/cross-${writer_name}-to-${reader_name}.tar"
   echo
   echo "===== $writer_name snapshot -> $reader_name load ====="
 
