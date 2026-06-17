@@ -250,6 +250,7 @@ a.txt
 /data/a.txt
 === find_name ===
 /data/a.txt
+/data/anchors.txt
 /data/b.txt
 /data/c.txt
 /data/dup.txt
@@ -276,6 +277,7 @@ a.txt
 === find_type_f ===
 /data/a.txt
 /data/abc.csv
+/data/anchors.txt
 /data/b.txt
 /data/binary.bin
 /data/c.txt
@@ -308,6 +310,7 @@ a.txt
 === ls ===
 a.txt
 abc.csv
+anchors.txt
 b.txt
 binary.bin
 c.txt
@@ -338,6 +341,7 @@ users.json
 === ls_1 ===
 a.txt
 abc.csv
+anchors.txt
 b.txt
 binary.bin
 c.txt
@@ -448,6 +452,7 @@ baz
 === find_mindepth ===
 /data/a.txt
 /data/abc.csv
+/data/anchors.txt
 /data/b.txt
 /data/binary.bin
 /data/c.txt
@@ -480,6 +485,7 @@ baz
 === find_maxdepth ===
 /data/a.txt
 /data/abc.csv
+/data/anchors.txt
 /data/b.txt
 /data/binary.bin
 /data/c.txt
@@ -507,6 +513,7 @@ baz
 /data/users.json
 === find_multi_name ===
 /data/a.txt
+/data/anchors.txt
 /data/b.txt
 /data/c.txt
 /data/dup.txt
@@ -578,7 +585,7 @@ world
       2 b
       1 c
 === find_pipe_wc ===
-24
+25
 === jq_pipe_wc ===
 3
 === cat_tr_sort ===
@@ -603,7 +610,7 @@ world
 3
 === find_sort_head ===
 /data/a.txt
-/data/b.txt
+/data/anchors.txt
 === cat_empty ===
 
 === wc_empty ===
@@ -658,6 +665,7 @@ world
 /data/sub/deep
 === find_iname ===
 /data/a.txt
+/data/anchors.txt
 /data/b.txt
 /data/c.txt
 /data/dup.txt
@@ -684,6 +692,7 @@ world
 === find_size_gt ===
 /data/a.txt
 /data/abc.csv
+/data/anchors.txt
 /data/binary.bin
 /data/c.txt
 /data/chat.jsonl
@@ -712,6 +721,7 @@ world
 /data/users.json
 === find_recurse ===
 /data/a.txt
+/data/anchors.txt
 /data/b.txt
 /data/c.txt
 /data/dup.txt
@@ -861,6 +871,24 @@ INSERTED
 foo
 bar
 baz
+=== sed_anchor_sub ===
+#TS
+ls
+#TS
+foo bar
+=== sed_anchor_sub_E ===
+#TS
+ls
+#TS
+foo bar
+=== sed_anchor_sub_g ===
+#TS
+ls
+#TS
+foo bar
+=== sed_anchor_addr_del ===
+ls
+foo bar
 === tr_squeeze ===
 abc
 === tr_complement ===
@@ -1048,6 +1076,7 @@ baz,
 === find_depth ===
 /data/a.txt
 /data/abc.csv
+/data/anchors.txt
 /data/b.txt
 /data/binary.bin
 /data/c.txt
@@ -1080,6 +1109,7 @@ baz,
 === find_mtime ===
 /data/a.txt
 /data/abc.csv
+/data/anchors.txt
 /data/b.txt
 /data/binary.bin
 /data/c.txt
@@ -1150,7 +1180,7 @@ baz,
 === du_file ===
 24	/data/a.txt
 === du_dir ===
-628	/data
+649	/data
 === du_h ===
 24B	/data/a.txt
 === tree ===
@@ -1403,8 +1433,8 @@ at_root.txt
 === root_create_dirname ===
 /data
 === history_last_two ===
-375  basename /data/at_root.txt
-376  dirname /data/at_root.txt
+381  basename /data/at_root.txt
+382  dirname /data/at_root.txt
 === bash_history_tail ===
 basename /data/at_root.txt
 dirname /data/at_root.txt

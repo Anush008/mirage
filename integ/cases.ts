@@ -47,6 +47,7 @@ export const SEED_FILES: Record<string, string> = {
   "/data/patterns2.txt": "baz\n",
   "/data/guard/g.txt": "guard\n",
   "/data/guard/sub/s.txt": "inner\n",
+  "/data/anchors.txt": "#123\nls\n#456\nfoo bar\n",
 };
 
 export const CASES: ReadonlyArray<readonly [string, string]> = [
@@ -260,6 +261,11 @@ export const CASES: ReadonlyArray<readonly [string, string]> = [
   ["sed_replace_n", "sed 's/o/O/2' /data/a.txt"],
   ["sed_delete_pattern", "sed '/foo/d' /data/a.txt"],
   ["sed_append", "sed '2a\\\nINSERTED' /data/a.txt"],
+  // Anchored ^/$ must apply per line (strukto-ai/mirage#326).
+  ["sed_anchor_sub", "cat /data/anchors.txt | sed 's/^#[0-9]*$/#TS/'"],
+  ["sed_anchor_sub_E", "cat /data/anchors.txt | sed -E 's/^#[0-9]+$/#TS/'"],
+  ["sed_anchor_sub_g", "cat /data/anchors.txt | sed 's/^#[0-9]*$/#TS/g'"],
+  ["sed_anchor_addr_del", "cat /data/anchors.txt | sed '/^#[0-9]*$/d'"],
 
   ["tr_squeeze", "echo aaabbbccc | tr -s a-z"],
   ["tr_complement", "cat /data/a.txt | tr -c 'a-z\\n' '*'"],

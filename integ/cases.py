@@ -78,6 +78,8 @@ SEED_FILES = {
     "guard\n",
     "/data/guard/sub/s.txt":
     "inner\n",
+    "/data/anchors.txt":
+    "#123\nls\n#456\nfoo bar\n",
 }
 
 CASES: list[tuple[str, str]] = [
@@ -323,6 +325,11 @@ CASES: list[tuple[str, str]] = [
     ("sed_replace_n", "sed 's/o/O/2' /data/a.txt"),
     ("sed_delete_pattern", "sed '/foo/d' /data/a.txt"),
     ("sed_append", "sed '2a\\\nINSERTED' /data/a.txt"),
+    # Anchored ^/$ must apply per line (strukto-ai/mirage#326).
+    ("sed_anchor_sub", "cat /data/anchors.txt | sed 's/^#[0-9]*$/#TS/'"),
+    ("sed_anchor_sub_E", "cat /data/anchors.txt | sed -E 's/^#[0-9]+$/#TS/'"),
+    ("sed_anchor_sub_g", "cat /data/anchors.txt | sed 's/^#[0-9]*$/#TS/g'"),
+    ("sed_anchor_addr_del", "cat /data/anchors.txt | sed '/^#[0-9]*$/d'"),
 
     # ----- tr advanced -----
     ("tr_squeeze", "echo aaabbbccc | tr -s a-z"),
