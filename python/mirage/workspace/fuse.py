@@ -12,7 +12,10 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import os
+import subprocess
 import sys
+import tempfile
 from threading import Thread
 
 
@@ -22,6 +25,7 @@ class FuseManager:
         self._mountpoint: str | None = None
         self._thread: Thread | None = None
         self._auto: bool = False
+        self._owns_mountpoint: bool = False
 
     @property
     def mountpoint(self) -> str | None:
@@ -30,20 +34,20 @@ class FuseManager:
     @mountpoint.setter
     def mountpoint(self, path: str | None) -> None:
         self._mountpoint = path
+        self._owns_mountpoint = False
 
     def setup(self,
               ws: object,
               root_prefix: str = "",
               mountpoint: str | None = None) -> None:
-        import os
-        import tempfile
-
         from mirage.fuse.mount import mount_background
         if mountpoint:
             os.makedirs(mountpoint, exist_ok=True)
             self._mountpoint = mountpoint
+            self._owns_mountpoint = False
         else:
             self._mountpoint = tempfile.mkdtemp(prefix="mirage-")
+            self._owns_mountpoint = True
         self._thread = mount_background(ws,
                                         self._mountpoint,
                                         root_prefix=root_prefix)
@@ -52,19 +56,19 @@ class FuseManager:
     def unmount(self) -> None:
         if not self._mountpoint:
             return
-        import subprocess as _sp
         if sys.platform == "darwin":
-            _sp.run(["diskutil", "unmount", "force", self._mountpoint],
-                    capture_output=True)
+            subprocess.run(["diskutil", "unmount", "force", self._mountpoint],
+                           capture_output=True)
         else:
-            _sp.run(["fusermount", "-u", self._mountpoint],
-                    capture_output=True)
-        try:
-            import os as _os
-            _os.rmdir(self._mountpoint)
-        except OSError:
-            pass
+            subprocess.run(["fusermount", "-u", self._mountpoint],
+                           capture_output=True)
+        if self._owns_mountpoint:
+            try:
+                os.rmdir(self._mountpoint)
+            except OSError:
+                pass
         self._mountpoint = None
+        self._owns_mountpoint = False
 
     def close(self) -> None:
         if self._mountpoint and self._auto:

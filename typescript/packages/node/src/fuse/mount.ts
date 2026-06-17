@@ -22,6 +22,7 @@ import { MirageFS } from './fs.ts'
 
 export interface FuseHandle {
   mountpoint: string
+  ownsMountpoint: boolean
   unmount: () => Promise<void>
 }
 
@@ -83,12 +84,14 @@ export function forceUnmount(mountpoint: string): void {
 export async function mount(ws: Workspace, options: MountOptions = {}): Promise<FuseHandle> {
   const Fuse = await loadFuse()
   let mountpoint: string
+  let ownsMountpoint = false
   if (options.mountpoint !== undefined) {
     // Pinned path: create it if missing, mirroring Python's os.makedirs.
     mkdirSync(options.mountpoint, { recursive: true })
     mountpoint = options.mountpoint
   } else {
     mountpoint = mkdtempSync(join(tmpdir(), 'mirage-fuse-'))
+    ownsMountpoint = true
   }
   const agentId = options.agentId
   const mfs = new MirageFS(ws, {
@@ -116,6 +119,7 @@ export async function mount(ws: Workspace, options: MountOptions = {}): Promise<
   })
   return {
     mountpoint,
+    ownsMountpoint,
     unmount: () =>
       new Promise<void>((resolve, reject) => {
         fuse.unmount((err) => {
