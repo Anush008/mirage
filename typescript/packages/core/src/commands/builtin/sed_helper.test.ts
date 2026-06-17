@@ -87,3 +87,39 @@ describe('sed s/// flags', () => {
     expect(sed('s/o/X/2i', 'oOoO\n')).toBe('oXoO\n')
   })
 })
+
+describe('sed y (transliterate)', () => {
+  it('translates characters by position', () => {
+    expect(sed('y/el/ip/', 'hello\n')).toBe('hippo\n')
+  })
+
+  it('leaves unmatched characters unchanged', () => {
+    expect(sed('y/-/ /', 'a-b-c\n')).toBe('a b c\n')
+  })
+
+  it('applies per line and preserves newlines', () => {
+    expect(sed('y/abc/xyz/', 'cab\nbac\n')).toBe('zxy\nyxz\n')
+  })
+
+  it('rejects mismatched source/dest lengths', () => {
+    expect(() => parseProgram('y/ab/x/')).toThrow()
+  })
+})
+
+describe('sed c (change)', () => {
+  it('changes every line when given no address', () => {
+    expect(sed('c\\\nX', 'a\nb\nc\n')).toBe('X\nX\nX\n')
+  })
+
+  it('changes a single addressed line', () => {
+    expect(sed('2c\\\nX', 'a\nb\nc\n')).toBe('a\nX\nc\n')
+  })
+
+  it('changes a regex-addressed line', () => {
+    expect(sed('/foo/c\\\nCHANGED', 'foo\nbar\n')).toBe('CHANGED\nbar\n')
+  })
+
+  it('emits the text once for a line range', () => {
+    expect(sed('2,3c\\\nX', 'a\nb\nc\nd\n')).toBe('a\nX\nd\n')
+  })
+})

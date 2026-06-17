@@ -99,12 +99,35 @@ export function parseOneCommand(rest: string): [SedCommand, string] {
     const remaining = parts.length > 3 ? parts.slice(3).join(delim) : ''
     return [{ cmd: 's', pattern, replacement, exprFlags, addrStart, addrEnd }, remaining]
   }
+  if (ch === 'y') {
+    // y/src/dst/ — transliterate src[i] -> dst[i]; the two sets must match in
+    // length. Parsed like `s` (naive split on the delimiter).
+    const delim = rest[1]
+    if (delim === undefined) throw new Error('sed: missing delimiter')
+    const parts = rest.slice(2).split(delim)
+    const pattern = parts[0] ?? ''
+    const replacement = parts.length > 1 ? (parts[1] ?? '') : ''
+    const remaining = parts.length > 2 ? parts.slice(2).join(delim) : ''
+    if (pattern.length !== replacement.length) {
+      throw new Error('sed: strings for `y` command are different lengths')
+    }
+    return [{ cmd: 'y', pattern, replacement, addrStart, addrEnd }, remaining]
+  }
   if (ch !== undefined && SIMPLE_CMDS.has(ch)) {
     return [{ cmd: ch, addrStart, addrEnd }, rest.slice(1)]
   }
-  if (ch === 'a' || ch === 'i') {
+  if (ch === 'a' || ch === 'i' || ch === 'c') {
+    // Text forms: `a\` <newline> text (the classic multi-line form, where the
+    // backslash-newline is a continuation and not part of the text), `a\text`,
+    // and the one-line `a text`. Strip that leading prefix so the text itself
+    // does not start with a stray newline.
     let text = rest.slice(1)
-    if (text.startsWith('\\') || text.startsWith(' ')) text = text.slice(1)
+    if (text.startsWith('\\')) {
+      text = text.slice(1)
+      if (text.startsWith('\n')) text = text.slice(1)
+    } else if (text.startsWith(' ')) {
+      text = text.slice(1)
+    }
     let end = text.length
     for (let j = 0; j < text.length; j++) {
       if (text[j] === ';') {
@@ -363,6 +386,30 @@ export function executeProgram(text: string, commands: SedCommand[], suppress = 
         deferred.push((cmd.text ?? '') + '\n')
       } else if (c === 'i') {
         output.push((cmd.text ?? '') + '\n')
+      } else if (c === 'y') {
+        // Transliterate each char of pattern[i] -> replacement[i]. Leave the
+        // line-separator newline untouched (POSIX pattern-space semantics).
+        const from = cmd.pattern ?? ''
+        const to = cmd.replacement ?? ''
+        const hasNewline = pattern.endsWith('\n')
+        const bodyY = hasNewline ? pattern.slice(0, -1) : pattern
+        let outY = ''
+        for (const chr of bodyY) {
+          const idx = from.indexOf(chr)
+          outY += idx >= 0 ? (to[idx] ?? chr) : chr
+        }
+        pattern = hasNewline ? outY + '\n' : outY
+      } else if (c === 'c') {
+        // Change: delete the pattern space and emit the text. For a single
+        // address (or none) emit on each match; for a range emit once, when
+        // the range closes (or at EOF if it never does), matching GNU sed.
+        deleteFlag = true
+        const isRange = cmd.addrEnd !== null && cmd.addrEnd !== undefined
+        const rangeOpen = rangeActive.get(pc) === true
+        if (!isRange || !rangeOpen || lineno === total) {
+          output.push((cmd.text ?? '') + '\n')
+        }
+        break
       } else if (c === 'q') {
         output.push(pattern)
         return output.join('')

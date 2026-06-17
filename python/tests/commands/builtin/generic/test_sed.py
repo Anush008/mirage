@@ -187,3 +187,42 @@ async def test_sed_p_flag_under_suppress_prints_only_substituted():
     output, _ = await sed([], "s/hi/HI/p", read_bytes=rb, write_bytes=wb,
                           stdin=b"hi\nbye\n", suppress=True)
     assert output == b"HI\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_y_transliterate():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([], "y/el/ip/", read_bytes=rb, write_bytes=wb,
+                          stdin=b"hello\n")
+    assert output == b"hippo\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_y_mismatched_lengths_raises():
+    rb, wb, _ = _make_backend({})
+    with pytest.raises(ValueError, match="different lengths"):
+        await sed([], "y/ab/x/", read_bytes=rb, write_bytes=wb, stdin=b"a\n")
+
+
+@pytest.mark.asyncio
+async def test_sed_c_no_address_changes_every_line():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([], "c\\\nX", read_bytes=rb, write_bytes=wb,
+                          stdin=b"a\nb\nc\n")
+    assert output == b"X\nX\nX\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_c_single_address():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([], "2c\\\nX", read_bytes=rb, write_bytes=wb,
+                          stdin=b"a\nb\nc\n")
+    assert output == b"a\nX\nc\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_c_range_emits_once():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([], "2,3c\\\nX", read_bytes=rb, write_bytes=wb,
+                          stdin=b"a\nb\nc\nd\n")
+    assert output == b"a\nX\nd\n"

@@ -351,6 +351,10 @@ CASES: list[tuple[str, str]] = [
     ("sed_count_nth_g", "sed 's/o/O/2g' /data/oooo.txt"),
     # s///p prints the pattern space on substitution (here with -n).
     ("sed_sub_p", "cat /data/oooo.txt | sed -n 's/o/O/p'"),
+    # y/// transliterate, and the change command (single address + range).
+    ("sed_y", "echo hello | sed 'y/el/ip/'"),
+    ("sed_c_addr", "sed '2cCHANGED' /data/a.txt"),
+    ("sed_c_range", "sed '2,4cMID' /data/a.txt"),
 
     # ----- tr advanced -----
     ("tr_squeeze", "echo aaabbbccc | tr -s a-z"),

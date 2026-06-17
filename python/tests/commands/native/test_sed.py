@@ -128,3 +128,21 @@ def test_sed_n_p_flag(env):
     data = b"hi\nbye\n"
     assert env.mirage("sed -n 's/hi/HI/p'", stdin=data) == env.native(
         "sed -n 's/hi/HI/p'", stdin=data)
+
+
+def test_sed_y_transliterate(env):
+    data = b"hello\n"
+    assert env.mirage("sed 'y/el/ip/'", stdin=data) == env.native(
+        "sed 'y/el/ip/'", stdin=data)
+
+
+def test_sed_c_single_address(env):
+    data = b"a\nb\nc\n"
+    assert env.mirage("sed '2c\\\nX'", stdin=data) == env.native(
+        "sed '2c\\\nX'", stdin=data)
+
+
+def test_sed_c_range(env):
+    data = b"a\nb\nc\nd\n"
+    assert env.mirage("sed '2,3c\\\nX'", stdin=data) == env.native(
+        "sed '2,3c\\\nX'", stdin=data)

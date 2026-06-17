@@ -154,15 +154,41 @@ def _parse_one_command(rest: str) -> tuple[dict, str]:
             "addr_start": addr_start,
             "addr_end": addr_end,
         }, remaining
+    if ch == "y":
+        # y/src/dst/ — transliterate src[i] -> dst[i]; the two sets must match
+        # in length. Parsed like `s` (naive split on the delimiter).
+        delim = rest[1]
+        parts = rest[2:].split(delim)
+        pattern = parts[0]
+        replacement = parts[1] if len(parts) > 1 else ""
+        remaining = delim.join(parts[2:]) if len(parts) > 2 else ""
+        if len(pattern) != len(replacement):
+            raise ValueError(
+                "sed: strings for `y` command are different lengths")
+        return {
+            "cmd": "y",
+            "pattern": pattern,
+            "replacement": replacement,
+            "addr_start": addr_start,
+            "addr_end": addr_end,
+        }, remaining
     if ch in _SIMPLE_CMDS:
         return {
             "cmd": ch,
             "addr_start": addr_start,
             "addr_end": addr_end,
         }, rest[1:]
-    if ch in ("a", "i"):
+    if ch in ("a", "i", "c"):
+        # Text forms: `a\` <newline> text (classic multi-line form, where the
+        # backslash-newline is a continuation and not part of the text),
+        # `a\text`, and the one-line `a text`. Strip that leading prefix so the
+        # text itself does not start with a stray newline.
         text = rest[1:]
-        if text and text[0] in ("\\", " "):
+        if text.startswith("\\"):
+            text = text[1:]
+            if text.startswith("\n"):
+                text = text[1:]
+        elif text.startswith(" "):
             text = text[1:]
         end = len(text)
         for j, c in enumerate(text):
@@ -347,6 +373,26 @@ def _execute_program(text: str,
                 deferred.append(cmd["text"] + "\n")
             elif c == "i":
                 output.append(cmd["text"] + "\n")
+            elif c == "y":
+                # Transliterate pattern[i] -> replacement[i], leaving the
+                # line-separator newline untouched (POSIX pattern-space).
+                src = cmd["pattern"]
+                dst = cmd["replacement"]
+                has_nl = pattern.endswith("\n")
+                body_y = pattern[:-1] if has_nl else pattern
+                table = str.maketrans(src, dst)
+                translated = body_y.translate(table)
+                pattern = translated + "\n" if has_nl else translated
+            elif c == "c":
+                # Change: delete the pattern space and emit the text. For a
+                # single address (or none) emit on each match; for a range emit
+                # once, when the range closes (or at EOF), matching GNU sed.
+                delete = True
+                is_range = addr_end is not None
+                range_open = range_active.get(id(cmd), False)
+                if (not is_range) or (not range_open) or (lineno == total):
+                    output.append(cmd["text"] + "\n")
+                break
             elif c == "q":
                 output.append(pattern)
                 return "".join(output)

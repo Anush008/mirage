@@ -304,6 +304,45 @@ describe.each(NATIVE_BACKENDS)('native sed (%s backend)', (kind) => {
     }
   })
 
+  it('sed y/// transliterates, matches native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const data = ENC.encode('hello\n')
+      const m = await env.mirage("sed 'y/el/ip/'", data)
+      const n = await env.native("sed 'y/el/ip/'", data)
+      expect(m).toBe(n)
+      expect(m).toBe('hippo\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
+  it('sed c changes an addressed line, matches native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const data = ENC.encode('a\nb\nc\n')
+      const m = await env.mirage("sed '2c\\\nX'", data)
+      const n = await env.native("sed '2c\\\nX'", data)
+      expect(m).toBe(n)
+      expect(m).toBe('a\nX\nc\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
+  it('sed c changes a line range once, matches native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const data = ENC.encode('a\nb\nc\nd\n')
+      const m = await env.mirage("sed '2,3c\\\nX'", data)
+      const n = await env.native("sed '2,3c\\\nX'", data)
+      expect(m).toBe(n)
+      expect(m).toBe('a\nX\nd\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
   it('sed -i edits file in place', async () => {
     const env = makeEnv(kind)
     try {

@@ -904,7 +904,6 @@ baz
 === sed_append ===
 hello
 world
-
 INSERTED
 foo
 bar
@@ -945,6 +944,18 @@ oOOO
 === sed_sub_p ===
 Oooo
 Oooo
+=== sed_y ===
+hippo
+=== sed_c_addr ===
+hello
+CHANGED
+foo
+bar
+baz
+=== sed_c_range ===
+hello
+MID
+baz
 === tr_squeeze ===
 abc
 === tr_complement ===
@@ -1616,8 +1627,8 @@ disptree/d
 disptree/d/y.txt
 disptree/x.txt
 === history_last_two ===
-434  (cd /data && ls -R disptree)
-435  (cd /data && find disptree)
+437  (cd /data && ls -R disptree)
+438  (cd /data && find disptree)
 === bash_history_tail ===
 (cd /data && ls -R disptree)
 (cd /data && find disptree)
