@@ -956,6 +956,18 @@ baz
 hello
 MID
 baz
+=== sed_bre_group ===
+[foo]
+=== sed_bre_plus ===
+Xb
+=== sed_bre_alt ===
+PET
+=== sed_ere_group ===
+[foo]
+=== sed_ere_plus ===
+Xb
+=== sed_r_alias ===
+Xb
 === tr_squeeze ===
 abc
 === tr_complement ===
@@ -1627,8 +1639,8 @@ disptree/d
 disptree/d/y.txt
 disptree/x.txt
 === history_last_two ===
-437  (cd /data && ls -R disptree)
-438  (cd /data && find disptree)
+443  (cd /data && ls -R disptree)
+444  (cd /data && find disptree)
 === bash_history_tail ===
 (cd /data && ls -R disptree)
 (cd /data && find disptree)

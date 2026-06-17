@@ -13,10 +13,15 @@
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import { describe, expect, it } from 'vitest'
-import { executeProgram, parseProgram } from './sed_helper.ts'
+import { breToEre, executeProgram, parseProgram } from './sed_helper.ts'
 
-function sed(expr: string, input: string, suppress = false): string {
-  return executeProgram(input, parseProgram(expr), suppress)
+function sed(expr: string, input: string, suppress = false, extended = false): string {
+  return executeProgram(input, parseProgram(expr), suppress, extended)
+}
+
+// ERE convenience: sed -E
+function sedE(expr: string, input: string): string {
+  return sed(expr, input, false, true)
 }
 
 describe('sed line anchors (^ and $)', () => {
@@ -26,7 +31,7 @@ describe('sed line anchors (^ and $)', () => {
   })
 
   it('anchored substitution with -E style + quantifier', () => {
-    expect(sed('s/^#[0-9]+$/#TS/', '#123\nls\n')).toBe('#TS\nls\n')
+    expect(sedE('s/^#[0-9]+$/#TS/', '#123\nls\n')).toBe('#TS\nls\n')
   })
 
   it('anchored substitution with global flag', () => {
@@ -121,5 +126,56 @@ describe('sed c (change)', () => {
 
   it('emits the text once for a line range', () => {
     expect(sed('2,3c\\\nX', 'a\nb\nc\nd\n')).toBe('a\nX\nd\n')
+  })
+})
+
+describe('breToEre translation', () => {
+  it('swaps backslashed and bare metacharacters', () => {
+    expect(breToEre('a\\+')).toBe('a+')
+    expect(breToEre('a+')).toBe('a\\+')
+    expect(breToEre('\\(foo\\)')).toBe('(foo)')
+    expect(breToEre('(foo)')).toBe('\\(foo\\)')
+    expect(breToEre('a\\{2\\}')).toBe('a{2}')
+    expect(breToEre('cat\\|dog')).toBe('cat|dog')
+  })
+
+  it('keeps bracket expressions verbatim', () => {
+    expect(breToEre('[a+b]')).toBe('[a+b]')
+    expect(breToEre('[^]x]')).toBe('[^]x]')
+  })
+
+  it('treats a leading * as literal and ^/$ positionally', () => {
+    expect(breToEre('*x')).toBe('\\*x')
+    expect(breToEre('a^b')).toBe('a\\^b')
+    expect(breToEre('a$b')).toBe('a\\$b')
+    expect(breToEre('^ab$')).toBe('^ab$')
+  })
+})
+
+describe('sed BRE (default) vs ERE (-E)', () => {
+  it('BRE: \\( \\) are groups, bare () are literal', () => {
+    expect(sed('s/\\(foo\\)/[\\1]/', 'foo\n')).toBe('[foo]\n')
+    expect(sed('s/(x)/Y/', '(x)\n')).toBe('Y\n')
+  })
+
+  it('BRE: \\+ is one-or-more, bare + is literal', () => {
+    expect(sed('s/a\\+/X/', 'aaab\n')).toBe('Xb\n')
+    expect(sed('s/a+/X/', 'a+b\n')).toBe('Xb\n')
+  })
+
+  it('BRE: \\{n\\} interval and \\| alternation', () => {
+    expect(sed('s/a\\{2\\}/X/', 'aaa\n')).toBe('Xa\n')
+    expect(sed('s/cat\\|dog/PET/', 'cat\n')).toBe('PET\n')
+  })
+
+  it('ERE: bare () are groups, + is one-or-more', () => {
+    expect(sedE('s/(foo)/[\\1]/', 'foo\n')).toBe('[foo]\n')
+    expect(sedE('s/a+/X/', 'aaab\n')).toBe('Xb\n')
+    expect(sedE('s/cat|dog/PET/', 'dog\n')).toBe('PET\n')
+  })
+
+  it('regex addresses honor BRE/ERE too', () => {
+    expect(sed('/a\\+/d', 'aaa\nbbb\n')).toBe('bbb\n')
+    expect(sedE('/a+/d', 'aaa\nbbb\n')).toBe('bbb\n')
   })
 })

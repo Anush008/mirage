@@ -160,7 +160,113 @@ export function parseProgram(expr: string): SedCommand[] {
   return commands
 }
 
-function addrMatches(addr: SedAddr, line: string, lineno: number, total: number): boolean {
+// Translate a POSIX Basic Regular Expression to the Extended syntax used by
+// the host regex engine (JS RegExp / Python re). GNU sed scripts are BRE by
+// default and ERE only under -E/-r. In BRE the bare metacharacters `( ) { } +
+// ? |` are literal and their backslashed forms are special; ERE is the
+// reverse. `^`/`$` are anchors only at the start/end (literal elsewhere) and a
+// leading `*` is literal. See issue: sed BRE/ERE support.
+export function breToEre(pat: string): string {
+  let out = ''
+  let i = 0
+  const n = pat.length
+  // True when the next character begins the regex or a subexpression (after
+  // `\(` or `\|`), where `*` is literal and `^` is an anchor.
+  let atStart = true
+  while (i < n) {
+    const ch = pat[i]
+    if (ch === undefined) break
+    if (ch === '[') {
+      // Bracket expression: copy verbatim through the closing `]`.
+      out += '['
+      let j = i + 1
+      if (pat[j] === '^') {
+        out += '^'
+        j += 1
+      }
+      if (pat[j] === ']') {
+        out += ']'
+        j += 1
+      }
+      while (j < n && pat[j] !== ']') {
+        out += pat[j] ?? ''
+        j += 1
+      }
+      if (j < n) {
+        out += ']'
+        j += 1
+      }
+      i = j
+      atStart = false
+      continue
+    }
+    if (ch === '\\') {
+      const nx = pat[i + 1]
+      if (nx === undefined) {
+        out += '\\'
+        i += 1
+        continue
+      }
+      // Backslashed (){}+?| are the *special* forms in BRE -> emit bare (ERE).
+      if (nx === '(' || nx === ')' || nx === '{' || nx === '}' || nx === '+' || nx === '?' || nx === '|') {
+        out += nx
+        atStart = nx === '(' || nx === '|'
+        i += 2
+        continue
+      }
+      // Any other escape passes through unchanged (\. \* \[ \\ \1.. \n \t ...).
+      out += '\\' + nx
+      atStart = false
+      i += 2
+      continue
+    }
+    // Bare (){}+?| are literal in BRE -> escape for ERE.
+    if (ch === '(' || ch === ')' || ch === '{' || ch === '}' || ch === '+' || ch === '?' || ch === '|') {
+      out += '\\' + ch
+      atStart = false
+      i += 1
+      continue
+    }
+    if (ch === '*') {
+      out += atStart ? '\\*' : '*'
+      atStart = false
+      i += 1
+      continue
+    }
+    if (ch === '^') {
+      // Anchor only at the start of the regex/subexpression; literal elsewhere.
+      // A leading `^` keeps the start context so a following `*` stays literal.
+      out += atStart ? '^' : '\\^'
+      i += 1
+      continue
+    }
+    if (ch === '$') {
+      // Anchor only at the end (or before `\)` / `\|`); literal elsewhere.
+      const isEnd =
+        i === n - 1 || (pat[i + 1] === '\\' && (pat[i + 2] === ')' || pat[i + 2] === '|'))
+      out += isEnd ? '$' : '\\$'
+      atStart = false
+      i += 1
+      continue
+    }
+    out += ch
+    atStart = false
+    i += 1
+  }
+  return out
+}
+
+function compilePattern(pat: string, flags: string, extended: boolean): RegExp {
+  return new RegExp(extended ? pat : breToEre(pat), flags)
+}
+
+function addrMatches(
+  addr: SedAddr,
+  line: string,
+  lineno: number,
+  total: number,
+  extended: boolean,
+): boolean {
   const [kind, val] = addr
   if (kind === 'line') return lineno === Number.parseInt(val, 10)
   if (kind === 'last') return lineno === total
@@ -169,7 +275,7 @@ function addrMatches(addr: SedAddr, line: string, lineno: number, total: number)
   // so anchored addresses like /^[0-9]*$/ behave per POSIX/GNU sed (and the
   // Python implementation). See issue #326.
   const subject = line.endsWith('\n') ? line.slice(0, -1) : line
-  return new RegExp(val).test(subject)
+  return compilePattern(val, '', extended).test(subject)
 }
 
 export function translateReplacement(repl: string): string {
@@ -223,6 +329,7 @@ function regexReplace(
   ignoreCase: boolean,
   global: boolean,
   count = 1,
+  extended = false,
 ): string {
   // POSIX sed line semantics: `^`/`$` anchor to the line content, not the
   // line-separator newline that splitLinesKeepEnds preserves. JS `$` (without
@@ -238,8 +345,9 @@ function regexReplace(
   // is replaced; with `g` that occurrence and every later one are. Iterate all
   // matches and decide per match so `N` and `Ng` both work.
   const baseFlags = ignoreCase ? 'i' : ''
-  const scan = new RegExp(pat, baseFlags + 'g')
-  const single = new RegExp(pat, baseFlags)
+  const erePat = extended ? pat : breToEre(pat)
+  const scan = new RegExp(erePat, baseFlags + 'g')
+  const single = new RegExp(erePat, baseFlags)
   const jsRepl = translateReplacement(repl)
   let n = 0
   const out = body.replace(scan, (m: string) => {
@@ -263,7 +371,12 @@ function splitLinesKeepEnds(text: string): string[] {
   return lines
 }
 
-export function executeProgram(text: string, commands: SedCommand[], suppress = false): string {
+export function executeProgram(
+  text: string,
+  commands: SedCommand[],
+  suppress = false,
+  extended = false,
+): string {
   const lines = splitLinesKeepEnds(text)
   const total = lines.length
   let hold = ''
@@ -302,14 +415,14 @@ export function executeProgram(text: string, commands: SedCommand[], suppress = 
         if (cmd.addrEnd !== null && cmd.addrEnd !== undefined) {
           const rid = pc
           if (rangeActive.get(rid) !== true) {
-            if (addrMatches(cmd.addrStart, pattern, lineno, total)) rangeActive.set(rid, true)
+            if (addrMatches(cmd.addrStart, pattern, lineno, total, extended)) rangeActive.set(rid, true)
             else matched = false
           }
           if (rangeActive.get(rid) === true) {
-            if (addrMatches(cmd.addrEnd, pattern, lineno, total)) rangeActive.set(rid, false)
+            if (addrMatches(cmd.addrEnd, pattern, lineno, total, extended)) rangeActive.set(rid, false)
           }
         } else {
-          if (!addrMatches(cmd.addrStart, pattern, lineno, total)) matched = false
+          if (!addrMatches(cmd.addrStart, pattern, lineno, total, extended)) matched = false
         }
       }
 
@@ -340,7 +453,7 @@ export function executeProgram(text: string, commands: SedCommand[], suppress = 
         const ef = cmd.exprFlags ?? ''
         const countMatch = /[0-9]+/.exec(ef)
         const count = countMatch ? Number.parseInt(countMatch[0], 10) : 1
-        const newPattern = regexReplace(pattern, pat, repl, ef.includes('i'), ef.includes('g'), count)
+        const newPattern = regexReplace(pattern, pat, repl, ef.includes('i'), ef.includes('g'), count, extended)
         const changed = newPattern !== pattern
         if (changed) substituted = true
         pattern = newPattern

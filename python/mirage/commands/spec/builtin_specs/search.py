@@ -87,6 +87,7 @@ SPECS: dict[str, CommandSpec] = {
             Option(short="-e"),
             Option(short="-n"),
             Option(short="-E"),
+            Option(short="-r"),
         ),
         positional=(Operand(kind=OperandKind.TEXT), ),
         rest=Operand(kind=OperandKind.PATH),

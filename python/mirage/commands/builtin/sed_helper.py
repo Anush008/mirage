@@ -221,21 +221,105 @@ def _parse_program(expr: str) -> list[dict]:
     return commands
 
 
+def _bre_to_ere(pat: str) -> str:
+    """Translate a POSIX Basic Regular Expression to Extended syntax.
+
+    GNU sed scripts are BRE by default and ERE only under -E/-r. In BRE the
+    bare metacharacters ``( ) { } + ? |`` are literal and their backslashed
+    forms are special; ERE is the reverse. ``^``/``$`` are anchors only at the
+    start/end (literal elsewhere) and a leading ``*`` is literal. The Python
+    ``re`` engine is ERE-compatible, so feeding it the translated pattern
+    reproduces GNU BRE behavior.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(pat)
+    # True when the next char begins the regex or a subexpression (after \( or
+    # \|), where * is literal and ^ is an anchor.
+    at_start = True
+    while i < n:
+        ch = pat[i]
+        if ch == "[":
+            out.append("[")
+            j = i + 1
+            if j < n and pat[j] == "^":
+                out.append("^")
+                j += 1
+            if j < n and pat[j] == "]":
+                out.append("]")
+                j += 1
+            while j < n and pat[j] != "]":
+                out.append(pat[j])
+                j += 1
+            if j < n:
+                out.append("]")
+                j += 1
+            i = j
+            at_start = False
+            continue
+        if ch == "\\":
+            nx = pat[i + 1] if i + 1 < n else ""
+            if nx == "":
+                out.append("\\")
+                i += 1
+                continue
+            if nx in "(){}+?|":
+                out.append(nx)
+                at_start = nx in "(|"
+                i += 2
+                continue
+            out.append("\\" + nx)
+            at_start = False
+            i += 2
+            continue
+        if ch in "(){}+?|":
+            out.append("\\" + ch)
+            at_start = False
+            i += 1
+            continue
+        if ch == "*":
+            out.append("\\*" if at_start else "*")
+            at_start = False
+            i += 1
+            continue
+        if ch == "^":
+            out.append("^" if at_start else "\\^")
+            i += 1
+            continue
+        if ch == "$":
+            is_end = (i == n - 1
+                      or (pat[i + 1] == "\\" and i + 2 < n
+                          and pat[i + 2] in ")|"))
+            out.append("$" if is_end else "\\$")
+            at_start = False
+            i += 1
+            continue
+        out.append(ch)
+        at_start = False
+        i += 1
+    return "".join(out)
+
+
+def _re_pattern(pat: str, extended: bool) -> str:
+    return pat if extended else _bre_to_ere(pat)
+
+
 def _addr_matches(addr: tuple[str, str], line: str, lineno: int,
-                  total: int) -> bool:
+                  total: int, extended: bool = False) -> bool:
     kind, val = addr
     if kind == "line":
         return lineno == int(val)
     if kind == "last":
         return lineno == total
     if kind == "regex":
-        return re.search(val, line) is not None
+        return re.search(_re_pattern(val, extended), line) is not None
     return False
 
 
 def _execute_program(text: str,
                      commands: list[dict],
-                     suppress: bool = False) -> str:
+                     suppress: bool = False,
+                     extended: bool = False) -> str:
     lines = text.splitlines(keepends=True)
     total = len(lines)
     hold = ""
@@ -273,15 +357,15 @@ def _execute_program(text: str,
                 if addr_end is not None:
                     rid = id(cmd)
                     if not range_active.get(rid, False):
-                        if _addr_matches(addr_start, pattern, lineno, total):
+                        if _addr_matches(addr_start, pattern, lineno, total, extended):
                             range_active[rid] = True
                         else:
                             matched = False
                     if range_active.get(rid, False):
-                        if _addr_matches(addr_end, pattern, lineno, total):
+                        if _addr_matches(addr_end, pattern, lineno, total, extended):
                             range_active[rid] = False
                 else:
-                    if not _addr_matches(addr_start, pattern, lineno, total):
+                    if not _addr_matches(addr_start, pattern, lineno, total, extended):
                         matched = False
 
             if c == "{":
@@ -329,7 +413,7 @@ def _execute_program(text: str,
                            else _counter[0] == _nth)
                     return _apply_repl(m, repl=_repl_s) if hit else m.group(0)
 
-                new_pattern = re.sub(pat, _repl, pattern, flags=re_flags)
+                new_pattern = re.sub(_re_pattern(pat, extended), _repl, pattern, flags=re_flags)
                 changed = new_pattern != pattern
                 if changed:
                     substituted = True

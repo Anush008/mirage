@@ -44,4 +44,5 @@ async def sed(
         stdin=stdin,
         in_place=False,
         suppress=n,
+        extended=E or bool(_extra.get("r", False)),
     )

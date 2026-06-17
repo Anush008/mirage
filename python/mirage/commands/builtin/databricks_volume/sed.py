@@ -53,5 +53,6 @@ async def sed(
         accessor=accessor,
         stdin=stdin,
         suppress=n,
+        extended=E or bool(_extra.get("r", False)),
         index=index,
     )

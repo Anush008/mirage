@@ -355,6 +355,14 @@ CASES: list[tuple[str, str]] = [
     ("sed_y", "echo hello | sed 'y/el/ip/'"),
     ("sed_c_addr", "sed '2cCHANGED' /data/a.txt"),
     ("sed_c_range", "sed '2,4cMID' /data/a.txt"),
+    # BRE (default): \( \) groups, \+ one-or-more, \| alternation (GNU exts);
+    # bare + is literal. ERE via -E / -r: bare () + | are special.
+    ("sed_bre_group", r"echo foo | sed 's/\(foo\)/[\1]/'"),
+    ("sed_bre_plus", r"echo aaab | sed 's/a\+/X/'"),
+    ("sed_bre_alt", r"echo cat | sed 's/cat\|dog/PET/'"),
+    ("sed_ere_group", r"echo foo | sed -E 's/(foo)/[\1]/'"),
+    ("sed_ere_plus", "echo aaab | sed -E 's/a+/X/'"),
+    ("sed_r_alias", "echo aaab | sed -r 's/a+/X/'"),
 
     # ----- tr advanced -----
     ("tr_squeeze", "echo aaabbbccc | tr -s a-z"),

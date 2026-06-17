@@ -343,6 +343,68 @@ describe.each(NATIVE_BACKENDS)('native sed (%s backend)', (kind) => {
     }
   })
 
+  it('sed BRE group + backref matches native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const data = ENC.encode('foo\n')
+      const m = await env.mirage("sed 's/\\(foo\\)/[\\1]/'", data)
+      const n = await env.native("sed 's/\\(foo\\)/[\\1]/'", data)
+      expect(m).toBe(n)
+      expect(m).toBe('[foo]\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
+  it('sed BRE interval and bare + literal match native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const d1 = ENC.encode('aaa\n')
+      expect(await env.mirage("sed 's/a\\{2\\}/X/'", d1)).toBe(
+        await env.native("sed 's/a\\{2\\}/X/'", d1),
+      )
+      const d2 = ENC.encode('a+b\n')
+      const m = await env.mirage("sed 's/a+/X/'", d2)
+      expect(m).toBe(await env.native("sed 's/a+/X/'", d2))
+      expect(m).toBe('Xb\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
+  it('sed -E group/quantifier/alternation match native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const d1 = ENC.encode('foo\n')
+      expect(await env.mirage("sed -E 's/(foo)/[\\1]/'", d1)).toBe(
+        await env.native("sed -E 's/(foo)/[\\1]/'", d1),
+      )
+      const d2 = ENC.encode('aaab\n')
+      expect(await env.mirage("sed -E 's/a+/X/'", d2)).toBe(
+        await env.native("sed -E 's/a+/X/'", d2),
+      )
+      const d3 = ENC.encode('dog\n')
+      const m = await env.mirage("sed -E 's/cat|dog/PET/'", d3)
+      expect(m).toBe(await env.native("sed -E 's/cat|dog/PET/'", d3))
+      expect(m).toBe('PET\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
+  it('sed -r is an alias for -E, matches native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const data = ENC.encode('aaab\n')
+      const m = await env.mirage("sed -r 's/a+/X/'", data)
+      const n = await env.native("sed -r 's/a+/X/'", data)
+      expect(m).toBe(n)
+      expect(m).toBe('Xb\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
   it('sed -i edits file in place', async () => {
     const env = makeEnv(kind)
     try {

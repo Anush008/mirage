@@ -39,6 +39,8 @@ export async function sedGeneric(
   }
   const suppress = opts.flags.n === true
   const inPlace = opts.flags.i === true
+  // -E / -r select Extended Regular Expressions; without them sed is BRE.
+  const extended = opts.flags.E === true || opts.flags.r === true
   let commands: SedCommand[]
   try {
     if (script.includes(';') || script.includes('{')) {
@@ -69,7 +71,7 @@ export async function sedGeneric(
         for (const p of paths) {
           const data = await materialize(stream(p))
           const text = DEC.decode(data)
-          const newText = executeProgram(text, commands, false)
+          const newText = executeProgram(text, commands, false, extended)
           const newData = ENC.encode(newText)
           await write(p, newData)
           writes[p.stripPrefix] = newData
@@ -80,7 +82,7 @@ export async function sedGeneric(
       for (const p of paths) {
         const data = await materialize(stream(p))
         const text = DEC.decode(data)
-        outputs.push(executeProgram(text, commands, false))
+        outputs.push(executeProgram(text, commands, false, extended))
       }
       const out: ByteSource = ENC.encode(outputs.join(''))
       return [out, new IOResult({ cache: paths.map((p) => p.stripPrefix) })]
@@ -92,7 +94,7 @@ export async function sedGeneric(
     for (const p of paths) {
       const data = await materialize(stream(p))
       const text = DEC.decode(data)
-      const result = executeProgram(text, commands, suppress)
+      const result = executeProgram(text, commands, suppress, extended)
       if (modifying) {
         const newData = ENC.encode(result)
         await write(p, newData)
@@ -113,6 +115,6 @@ export async function sedGeneric(
     return [null, new IOResult({ exitCode: 1, stderr: ENC.encode('sed: missing operand\n') })]
   }
   const text = DEC.decode(raw)
-  const result = executeProgram(text, commands, suppress)
+  const result = executeProgram(text, commands, suppress, extended)
   return [ENC.encode(result), new IOResult()]
 }

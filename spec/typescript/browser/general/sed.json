@@ -46,6 +46,13 @@
       "numeric_shorthand": false,
       "short": "-E",
       "value_kind": "none"
+    },
+    {
+      "description": null,
+      "long": null,
+      "numeric_shorthand": false,
+      "short": "-r",
+      "value_kind": "none"
     }
   ],
   "positional": [

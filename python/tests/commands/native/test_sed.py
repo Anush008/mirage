@@ -146,3 +146,39 @@ def test_sed_c_range(env):
     data = b"a\nb\nc\nd\n"
     assert env.mirage("sed '2,3c\\\nX'", stdin=data) == env.native(
         "sed '2,3c\\\nX'", stdin=data)
+
+
+def test_sed_bre_group_backref(env):
+    data = b"foo\n"
+    assert env.mirage(r"sed 's/\(foo\)/[\1]/'", stdin=data) == env.native(
+        r"sed 's/\(foo\)/[\1]/'", stdin=data)
+
+
+def test_sed_bre_interval(env):
+    data = b"aaa\n"
+    assert env.mirage(r"sed 's/a\{2\}/X/'", stdin=data) == env.native(
+        r"sed 's/a\{2\}/X/'", stdin=data)
+
+
+def test_sed_bre_bare_plus_literal(env):
+    data = b"a+b\n"
+    assert env.mirage("sed 's/a+/X/'", stdin=data) == env.native(
+        "sed 's/a+/X/'", stdin=data)
+
+
+def test_sed_ere_group_plus(env):
+    data = b"foo\n"
+    assert env.mirage(r"sed -E 's/(foo)/[\1]/'", stdin=data) == env.native(
+        r"sed -E 's/(foo)/[\1]/'", stdin=data)
+
+
+def test_sed_ere_alternation(env):
+    data = b"dog\n"
+    assert env.mirage("sed -E 's/cat|dog/PET/'", stdin=data) == env.native(
+        "sed -E 's/cat|dog/PET/'", stdin=data)
+
+
+def test_sed_r_alias(env):
+    data = b"aaab\n"
+    assert env.mirage("sed -r 's/a+/X/'", stdin=data) == env.native(
+        "sed -r 's/a+/X/'", stdin=data)

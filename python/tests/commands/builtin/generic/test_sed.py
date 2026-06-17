@@ -226,3 +226,46 @@ async def test_sed_c_range_emits_once():
     output, _ = await sed([], "2,3c\\\nX", read_bytes=rb, write_bytes=wb,
                           stdin=b"a\nb\nc\nd\n")
     assert output == b"a\nX\nd\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_bre_group_and_backref():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([], r"s/\(foo\)/[\1]/", read_bytes=rb,
+                          write_bytes=wb, stdin=b"foo\n")
+    assert output == b"[foo]\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_bre_plus_is_literal():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([], "s/a+/X/", read_bytes=rb, write_bytes=wb,
+                          stdin=b"a+b\n")
+    assert output == b"Xb\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_bre_backslash_plus_is_one_or_more():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([], r"s/a\+/X/", read_bytes=rb, write_bytes=wb,
+                          stdin=b"aaab\n")
+    assert output == b"Xb\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_ere_group_and_plus():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([], r"s/(foo)/[\1]/", read_bytes=rb, write_bytes=wb,
+                          stdin=b"foo\n", extended=True)
+    assert output == b"[foo]\n"
+    output, _ = await sed([], "s/a+/X/", read_bytes=rb, write_bytes=wb,
+                          stdin=b"aaab\n", extended=True)
+    assert output == b"Xb\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_ere_address():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([], "/a+/d", read_bytes=rb, write_bytes=wb,
+                          stdin=b"aaa\nbbb\n", extended=True)
+    assert output == b"bbb\n"
