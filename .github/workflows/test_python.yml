@@ -181,7 +181,7 @@ jobs:
 
       - name: Audit dependencies for known vulnerabilities (informational)
         working-directory: python
-        run: uv audit --preview-features audit --all-extras --no-extra camel
+        run: uv audit --preview-features audit --no-extra camel
 
   gate:
     name: test-python-gate
