@@ -358,6 +358,7 @@ export class Mount {
           pattern: p.pattern,
           resolved: p.resolved,
           prefix: mountPrefix,
+          asTyped: p.asTyped,
         }),
     )
 

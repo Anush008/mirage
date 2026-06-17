@@ -32,18 +32,18 @@ export class CacheManager {
   private readonly fileCache: FileCache | null
   private readonly index: IndexCacheStore | null
   private readonly prefix: string
-  private readonly isRemote: boolean
+  private readonly cachesReads: boolean
 
   constructor(
     fileCache: FileCache | null,
     index: IndexCacheStore | null,
     prefix: string,
-    isRemote: boolean,
+    cachesReads: boolean,
   ) {
     this.fileCache = fileCache
     this.index = index
     this.prefix = rstripSlash(prefix)
-    this.isRemote = isRemote
+    this.cachesReads = cachesReads
   }
 
   private virtual(path: string | PathSpec): string {
@@ -58,7 +58,7 @@ export class CacheManager {
   /** Invalidate caches after a write to `path` (resource-relative). */
   async invalidateAfterWrite(path: string | PathSpec): Promise<void> {
     const virtual = this.virtual(path)
-    if (this.isRemote && this.fileCache !== null) {
+    if (this.cachesReads && this.fileCache !== null) {
       await this.fileCache.remove(virtual)
     }
     await this.invalidateParent(virtual)
@@ -67,7 +67,7 @@ export class CacheManager {
   /** Invalidate caches after a deletion of `path` (resource-relative). */
   async invalidateAfterUnlink(path: string | PathSpec): Promise<void> {
     const virtual = this.virtual(path)
-    if (this.isRemote && this.fileCache !== null) {
+    if (this.cachesReads && this.fileCache !== null) {
       await this.fileCache.remove(virtual)
     }
     if (this.index !== null) {

@@ -281,7 +281,7 @@ def test_resource_registers_ops():
     op_names = {op.name for op in resource.ops_list()}
     assert {"read", "readdir", "stat", "write", "create", "unlink"} <= op_names
     assert resource.name == "databricks_volume"
-    assert resource.is_remote is True
+    assert resource.caches_reads is True
 
 
 def test_resource_registers_commands():

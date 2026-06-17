@@ -32,20 +32,20 @@ class CacheManager:
 
     def __init__(self, file_cache: FileCacheMixin | None,
                  index: IndexCacheStore | None, prefix: str,
-                 is_remote: bool) -> None:
+                 caches_reads: bool) -> None:
         """Args:
             file_cache (FileCacheMixin | None): Workspace file cache
                 store; entries are keyed by mount-absolute path.
             index (IndexCacheStore | None): The mount resource's index
                 cache; listings are keyed by mount-absolute path.
             prefix (str): Mount prefix (e.g. "/data/").
-            is_remote (bool): Whether the resource is remote; the file
-                cache only holds remote-backed paths.
+            caches_reads (bool): Whether the resource caches reads; the
+                file cache only holds paths for read-caching backends.
         """
         self._file_cache = file_cache
         self._index = index
         self._prefix = prefix.rstrip("/")
-        self._is_remote = is_remote
+        self._caches_reads = caches_reads
 
     def _virtual(self, path: str | PathSpec) -> str:
         if isinstance(path, PathSpec):
@@ -64,7 +64,7 @@ class CacheManager:
                 written.
         """
         virtual = self._virtual(path)
-        if self._is_remote and self._file_cache is not None:
+        if self._caches_reads and self._file_cache is not None:
             await self._file_cache.remove(virtual)
         await self._invalidate_parent(virtual)
 
@@ -76,7 +76,7 @@ class CacheManager:
                 removed.
         """
         virtual = self._virtual(path)
-        if self._is_remote and self._file_cache is not None:
+        if self._caches_reads and self._file_cache is not None:
             await self._file_cache.remove(virtual)
         if self._index is not None:
             await self._index.invalidate_dir(virtual)

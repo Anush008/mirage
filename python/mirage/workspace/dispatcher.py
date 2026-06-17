@@ -31,8 +31,9 @@ class Dispatcher:
     consistent.
 
     Owns the cache/IO coordination that used to live on Workspace: cache
-    lookups for remote reads, post-write file-cache eviction, and parent
-    index invalidation. Constructed with the registry, cache store, and
+    lookups for read-caching backends, post-write file-cache eviction,
+    and parent index invalidation. Constructed with the registry, cache
+    store, and
     consistency policy; holds no other workspace state. Drift checking
     stays on Workspace (it reads/writes snapshot-owned state), which guards
     its own dispatch wrapper before delegating here.
@@ -48,9 +49,9 @@ class Dispatcher:
                        **kwargs: Any) -> tuple[Any, IOResult]:
         mount = self._registry.mount_for(path.original)
         assert_mount_allowed(mount.prefix)
-        cacheable = mount.resource.is_remote is True
+        caches_reads = mount.resource.caches_reads
 
-        if cacheable and op in _DISPATCH_READ_OPS:
+        if caches_reads and op in _DISPATCH_READ_OPS:
             cached = await self._cache.get(path.original)
             if cached is not None:
                 if self._consistency == ConsistencyPolicy.ALWAYS:
@@ -93,7 +94,7 @@ class Dispatcher:
             mount = self._registry.mount_for(path)
         except ValueError:
             return False
-        return mount.resource.is_remote is True
+        return mount.resource.caches_reads
 
     async def invalidate_after_write_by_path(self, path: str) -> None:
         """Drop file-cache + stale parent index after a write to `path`.
@@ -101,7 +102,7 @@ class Dispatcher:
         Single source of truth for post-write invalidation. Called from
         both `Workspace.dispatch()` and `Ops._call(write=True)` so a
         write through any code path sees the same invalidation rules:
-        file cache is dropped only for remote-backed mounts, and the
+        file cache is dropped only for read-caching mounts, and the
         parent directory index is dirtied for any mount that maintains
         an index. No-op for paths that resolve to no known mount.
 
@@ -118,7 +119,6 @@ class Dispatcher:
         manager = mount.cache_manager
         if manager is None:
             manager = CacheManager(self._cache,
-                                   getattr(mount.resource, "index",
-                                           None), mount.prefix,
-                                   mount.resource.is_remote is True)
+                                   getattr(mount.resource, "index", None),
+                                   mount.prefix, mount.resource.caches_reads)
         await manager.invalidate_after_write(path)

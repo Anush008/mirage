@@ -61,7 +61,7 @@ class MountRegistry:
 
     def _attach_manager(self, m: Mount) -> None:
         m.cache_manager = CacheManager(self._file_cache, m.resource.index,
-                                       m.prefix, m.resource.is_remote is True)
+                                       m.prefix, m.resource.caches_reads)
 
     def set_default_mount(self, resource: BaseResource) -> None:
         """Set a default fallback mount (cache resource).
@@ -284,7 +284,7 @@ class MountRegistry:
         if (default is not None and path_scopes and resolved is not None
                 and not resolved.write
                 and isinstance(default.resource, FileCacheMixin)
-                and mount.resource.is_remote is True):
+                and mount.resource.caches_reads):
             keys = [p.original for p in path_scopes]
             if self._consistency == ConsistencyPolicy.ALWAYS:
                 await self._evict_stale(mount, default.resource, path_scopes)
