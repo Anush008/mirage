@@ -740,6 +740,19 @@ export async function runNotFound(ws: Workspace, mount: string): Promise<void> {
   }
 }
 
+// Emit a case's stdout. A non-empty body that does not end in a newline is
+// flagged with a git-style sentinel so truth.txt records the missing final
+// newline (otherwise the section separators would mask it).
+function emitBody(out: string): void {
+  if (out === "") {
+    process.stdout.write("\n");
+  } else if (out.endsWith("\n")) {
+    process.stdout.write(out);
+  } else {
+    process.stdout.write(out + "\n\\ No newline at end of output\n");
+  }
+}
+
 export async function runCases(ws: Workspace): Promise<void> {
   for (const [path, content] of Object.entries(SEED_FILES)) {
     const dir = path.slice(0, path.lastIndexOf("/"));
@@ -757,7 +770,7 @@ export async function runCases(ws: Workspace): Promise<void> {
       );
     }
     process.stdout.write(`=== ${name} ===\n`);
-    process.stdout.write(out.endsWith("\n") ? out : out + "\n");
+    emitBody(out);
   }
 
   for (const [name, cmd] of EXIT_CODE_CASES) {
@@ -765,7 +778,7 @@ export async function runCases(ws: Workspace): Promise<void> {
     const out = new TextDecoder().decode(result.stdout);
     process.stdout.write(`=== ${name} ===\n`);
     process.stdout.write(`exit=${result.exitCode}\n`);
-    if (out) process.stdout.write(out.endsWith("\n") ? out : out + "\n");
+    if (out) emitBody(out);
   }
 
   for (const [name, cmd] of NOT_FOUND_CASES) {

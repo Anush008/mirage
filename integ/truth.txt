@@ -32,6 +32,7 @@ hello
 world
 === head_c5 ===
 hello
+\ No newline at end of output
 === tail_default ===
 hello
 world
@@ -647,6 +648,7 @@ d41d8cd98f00b204e9800998ecf8427e  /data/empty.txt
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /data/empty.txt
 === cat_no_nl ===
 no trailing newline
+\ No newline at end of output
 === wc_no_nl ===
  0  3 19 /data/no_nl.txt
 === md5_one_byte ===
@@ -1090,6 +1092,7 @@ baz
 c
 === sed_no_final_nl ===
 NO trailing newline
+\ No newline at end of output
 === tr_squeeze ===
 abc
 === tr_complement ===
@@ -1568,6 +1571,7 @@ c
 olleh
 === base64_stdin_d ===
 hello
+\ No newline at end of output
 === cp_multi_into_dir ===
 
 === cp_multi_verify_a ===

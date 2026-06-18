@@ -824,6 +824,18 @@ SLEEP_CASES: list[tuple[str, str, float]] = [
 ]
 
 
+def _emit_body(out: str) -> None:
+    # A non-empty body without a trailing newline is flagged with a git-style
+    # sentinel so truth.txt records the missing final newline (otherwise the
+    # section separators would mask it).
+    if out == "":
+        print()
+    elif out.endswith("\n"):
+        print(out, end="")
+    else:
+        print(out + "\n\\ No newline at end of output")
+
+
 async def run_cases(ws) -> None:
     for path, content in SEED_FILES.items():
         await ws.execute(f"mkdir -p {path.rsplit('/', 1)[0]}")
@@ -834,7 +846,7 @@ async def run_cases(ws) -> None:
         result = await ws.execute(cmd)
         out = await result.stdout_str()
         print(f"=== {name} ===")
-        print(out, end="" if out.endswith("\n") else "\n")
+        _emit_body(out)
 
     for name, cmd in EXIT_CODE_CASES:
         result = await ws.execute(cmd)
@@ -842,7 +854,7 @@ async def run_cases(ws) -> None:
         print(f"=== {name} ===")
         print(f"exit={result.exit_code}")
         if out:
-            print(out, end="" if out.endswith("\n") else "\n")
+            _emit_body(out)
 
     for name, cmd in NOT_FOUND_CASES:
         result = await ws.execute(cmd)
