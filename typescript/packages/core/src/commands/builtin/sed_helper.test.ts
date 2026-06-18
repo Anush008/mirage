@@ -163,6 +163,30 @@ describe('sed replacement & hold-space (GNU semantics)', () => {
   it('G appends a blank line when the hold space is empty', () => {
     expect(sed('G', 'a\nb\n')).toBe('a\n\nb\n\n')
   })
+
+  it('H accumulates with a leading newline from an empty hold', () => {
+    expect(sed('H;${x;p}', 'a\nb\n', true)).toBe('\na\nb\n')
+  })
+})
+
+describe('sed multi-line pattern space (N / join / final newline)', () => {
+  it('joins all lines (the :a;N;$!ba idiom) with no trailing separator', () => {
+    expect(sed(':a;N;$!ba;s/\\n/,/g', 'a\nb\nc\n')).toBe('a,b,c\n')
+  })
+
+  it('N joins line pairs', () => {
+    expect(sed('N;s/\\n/ /', 'a\nb\nc\nd\n')).toBe('a b\nc d\n')
+  })
+
+  it('preserves a missing final newline', () => {
+    expect(sed('s/o/O/', 'foo')).toBe('fOo')
+    expect(sed('p', 'foo', true)).toBe('foo')
+  })
+
+  it('a line number address tracks the last line read after N', () => {
+    // after N, line 2 is current → $ matches and appends the hold (blank line)
+    expect(sed('N;$G', 'a\nb\n')).toBe('a\nb\n\n')
+  })
 })
 
 describe('breToEre translation', () => {
@@ -213,5 +237,19 @@ describe('sed BRE (default) vs ERE (-E)', () => {
   it('regex addresses honor BRE/ERE too', () => {
     expect(sed('/a\\+/d', 'aaa\nbbb\n')).toBe('bbb\n')
     expect(sedE('/a+/d', 'aaa\nbbb\n')).toBe('bbb\n')
+  })
+})
+
+describe('sed s/// edge cases', () => {
+  it('handles an escaped delimiter in the pattern', () => {
+    expect(sed('s/a\\/b/c/', 'a/b\n')).toBe('c\n')
+  })
+
+  it('handles an escaped delimiter in the replacement', () => {
+    expect(sed('s/x/a\\/b/', 'x\n')).toBe('a/b\n')
+  })
+
+  it('rejects a zero occurrence count', () => {
+    expect(() => parseProgram('s/o/O/0')).toThrow(/may not be zero/)
   })
 })

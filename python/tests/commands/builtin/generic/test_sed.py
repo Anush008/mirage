@@ -363,3 +363,55 @@ async def test_sed_negate_range():
                           write_bytes=wb,
                           stdin=b"a\nb\nc\nd\n")
     assert output == b"a\nb\nX\nX\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_join_all_idiom():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([],
+                          r":a;N;$!ba;s/\n/,/g",
+                          read_bytes=rb,
+                          write_bytes=wb,
+                          stdin=b"a\nb\nc\n")
+    assert output == b"a,b,c\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_hold_accumulate():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([],
+                          "H;${x;p}",
+                          read_bytes=rb,
+                          write_bytes=wb,
+                          stdin=b"a\nb\n",
+                          suppress=True)
+    assert output == b"\na\nb\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_preserves_missing_final_newline():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([],
+                          "s/o/O/",
+                          read_bytes=rb,
+                          write_bytes=wb,
+                          stdin=b"foo")
+    assert output == b"fOo"
+
+
+@pytest.mark.asyncio
+async def test_sed_escaped_delimiter():
+    rb, wb, _ = _make_backend({})
+    output, _ = await sed([],
+                          r"s/a\/b/c/",
+                          read_bytes=rb,
+                          write_bytes=wb,
+                          stdin=b"a/b\n")
+    assert output == b"c\n"
+
+
+@pytest.mark.asyncio
+async def test_sed_zero_count_rejected():
+    rb, wb, _ = _make_backend({})
+    with pytest.raises(ValueError, match="may not be zero"):
+        await sed([], "s/o/O/0", read_bytes=rb, write_bytes=wb, stdin=b"oo\n")

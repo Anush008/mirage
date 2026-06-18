@@ -157,14 +157,19 @@ def _parse_one_command(rest: str) -> tuple[dict, str]:
         # command (a plain split would fold `s/a/b/;d` into the flags).
         idx = 2
 
+        # A backslash escapes the next char (incl. the delimiter: s/a\/b/c/).
         def _field() -> str:
             nonlocal idx
-            start = idx
+            out: list[str] = []
             while idx < len(rest) and rest[idx] != delim:
+                if rest[idx] == "\\" and idx + 1 < len(rest):
+                    out.append(rest[idx:idx + 2])
+                    idx += 2
+                    continue
+                out.append(rest[idx])
                 idx += 1
-            value = rest[start:idx]
             idx += 1
-            return value
+            return "".join(out)
 
         pattern = _field()
         replacement = _field()
@@ -172,6 +177,10 @@ def _parse_one_command(rest: str) -> tuple[dict, str]:
         while idx < len(rest) and rest[idx] in "0123456789gpiImMe":
             expr_flags += rest[idx]
             idx += 1
+        cm = re.search(r"\d+", expr_flags)
+        if cm and int(cm.group()) == 0:
+            raise ValueError(
+                "sed: number option to `s' command may not be zero")
         return {
             "cmd": "s",
             "pattern": pattern,
@@ -357,11 +366,22 @@ def _addr_matches(addr: tuple[str, str],
     return False
 
 
+def _split_content_lines(text: str) -> tuple[list[str], bool]:
+    """Line contents WITHOUT trailing newlines (the pattern space excludes the
+    separator). The bool records whether the last line ended with a newline, so
+    output can preserve a missing final newline. Splits only on ``\\n``."""
+    if text == "":
+        return [], False
+    final_newline = text.endswith("\n")
+    body = text[:-1] if final_newline else text
+    return body.split("\n"), final_newline
+
+
 def _execute_program(text: str,
                      commands: list[dict],
                      suppress: bool = False,
                      extended: bool = False) -> str:
-    lines = text.splitlines(keepends=True)
+    lines, final_newline = _split_content_lines(text)
     total = len(lines)
     hold = ""
     output: list[str] = []
@@ -370,6 +390,11 @@ def _execute_program(text: str,
         if cmd["cmd"] == ":":
             label_map[cmd["label"]] = idx
     range_active: dict[int, bool] = {}
+
+    # Trailing newline for a pattern space whose last consumed line is `ln`
+    # (1-based): every line gets one except a last line that had none on input.
+    def tail_nl(ln: int) -> str:
+        return "\n" if (ln < total or final_newline) else ""
 
     i = 0
     while i < total:
@@ -471,7 +496,7 @@ def _execute_program(text: str,
                 pattern = new_pattern
                 # s///p prints the pattern space when a substitution was made.
                 if changed and "p" in eflags:
-                    output.append(pattern)
+                    output.append(pattern + tail_nl(lineno))
             elif c == "d":
                 delete = True
                 break
@@ -484,14 +509,16 @@ def _execute_program(text: str,
                 delete = True
                 break
             elif c == "p":
-                output.append(pattern)
+                output.append(pattern + tail_nl(lineno))
             elif c == "P":
                 nl = pattern.find("\n")
-                output.append(pattern[:nl + 1] if nl >= 0 else pattern)
+                output.append(pattern[:nl + 1] if nl >= 0 else pattern +
+                              tail_nl(lineno))
             elif c == "N":
                 if i < total:
-                    pattern += lines[i]
+                    pattern += "\n" + lines[i]
                     i += 1
+                    lineno = i
                 else:
                     break
             elif c == "h":
@@ -513,15 +540,9 @@ def _execute_program(text: str,
             elif c == "i":
                 output.append(cmd["text"] + "\n")
             elif c == "y":
-                # Transliterate pattern[i] -> replacement[i], leaving the
-                # line-separator newline untouched (POSIX pattern-space).
-                src = cmd["pattern"]
-                dst = cmd["replacement"]
-                has_nl = pattern.endswith("\n")
-                body_y = pattern[:-1] if has_nl else pattern
-                table = str.maketrans(src, dst)
-                translated = body_y.translate(table)
-                pattern = translated + "\n" if has_nl else translated
+                # Transliterate pattern[i] -> replacement[i].
+                pattern = pattern.translate(
+                    str.maketrans(cmd["pattern"], cmd["replacement"]))
             elif c == "c":
                 # Change: delete the pattern space and emit the text. For a
                 # single address (or none) emit on each match; for a range emit
@@ -533,7 +554,7 @@ def _execute_program(text: str,
                     output.append(cmd["text"] + "\n")
                 break
             elif c == "q":
-                output.append(pattern)
+                output.append(pattern + tail_nl(lineno))
                 return "".join(output)
             elif c == "b":
                 label = cmd.get("label", "")
@@ -554,7 +575,7 @@ def _execute_program(text: str,
 
         if not delete:
             if not suppress:
-                output.append(pattern)
+                output.append(pattern + tail_nl(lineno))
             output.extend(deferred)
 
     return "".join(output)

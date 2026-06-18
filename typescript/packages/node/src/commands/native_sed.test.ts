@@ -457,6 +457,32 @@ describe.each(NATIVE_BACKENDS)('native sed (%s backend)', (kind) => {
     }
   })
 
+  it('sed preserves a missing final newline, matches native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const data = ENC.encode('foo')
+      const m = await env.mirage("sed 's/o/O/'", data)
+      const n = await env.native("sed 's/o/O/'", data)
+      expect(m).toBe(n)
+      expect(m).toBe('fOo')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
+  it('sed escaped delimiter matches native', async () => {
+    const env = makeEnv(kind)
+    try {
+      const data = ENC.encode('a/b\n')
+      const m = await env.mirage("sed 's/a\\/b/c/'", data)
+      const n = await env.native("sed 's/a\\/b/c/'", data)
+      expect(m).toBe(n)
+      expect(m).toBe('c\n')
+    } finally {
+      await env.cleanup()
+    }
+  })
+
   it('sed -i edits file in place', async () => {
     const env = makeEnv(kind)
     try {

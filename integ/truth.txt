@@ -1077,6 +1077,19 @@ world
 foo
 Xar
 Xaz
+=== sed_join_all ===
+hello,world,foo,bar,baz
+=== sed_hold_accum ===
+
+hello
+world
+foo
+bar
+baz
+=== sed_escaped_delim ===
+c
+=== sed_no_final_nl ===
+NO trailing newline
 === tr_squeeze ===
 abc
 === tr_complement ===
@@ -1748,8 +1761,8 @@ disptree/d
 disptree/d/y.txt
 disptree/x.txt
 === history_last_two ===
-465  (cd /data && ls -R disptree)
-466  (cd /data && find disptree)
+469  (cd /data && ls -R disptree)
+470  (cd /data && find disptree)
 === bash_history_tail ===
 (cd /data && ls -R disptree)
 (cd /data && find disptree)

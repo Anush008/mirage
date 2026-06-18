@@ -212,3 +212,15 @@ def test_sed_negate_regex(env):
     data = b"a\nb\nc\n"
     assert env.mirage("sed '/b/!d'", stdin=data) == env.native("sed '/b/!d'",
                                                                stdin=data)
+
+
+def test_sed_missing_final_newline(env):
+    data = b"foo"
+    assert env.mirage("sed 's/o/O/'", stdin=data) == env.native("sed 's/o/O/'",
+                                                                stdin=data)
+
+
+def test_sed_escaped_delimiter(env):
+    data = b"a/b\n"
+    assert env.mirage(r"sed 's/a\/b/c/'",
+                      stdin=data) == env.native(r"sed 's/a\/b/c/'", stdin=data)

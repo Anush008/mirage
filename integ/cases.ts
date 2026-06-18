@@ -321,6 +321,12 @@ export const CASES: ReadonlyArray<readonly [string, string]> = [
   ['sed_neg_regex', "sed '/world/!d' /data/a.txt"],
   ['sed_neg_lastp', "sed -n '$!p' /data/a.txt"],
   ['sed_neg_range', "sed '1,3!s/./X/' /data/a.txt"],
+  // multi-line pattern space: join-all idiom, hold accumulation, escaped
+  // delimiter, and preservation of a missing final newline.
+  ['sed_join_all', "sed ':a;N;$!ba;s/\\n/,/g' /data/a.txt"],
+  ['sed_hold_accum', "sed -n 'H;${x;p}' /data/a.txt"],
+  ['sed_escaped_delim', "echo 'a/b' | sed 's/a\\/b/c/'"],
+  ['sed_no_final_nl', "sed 's/no/NO/' /data/no_nl.txt"],
 
   ["tr_squeeze", "echo aaabbbccc | tr -s a-z"],
   ["tr_complement", "cat /data/a.txt | tr -c 'a-z\\n' '*'"],

@@ -107,10 +107,19 @@ export function parseOneCommand(rest: string): [SedCommand, string] {
     // the trailing flag characters. Anything after is a separate command — a
     // plain split() would wrongly fold it into the flags (e.g. `s/a/b/;d`).
     let i = 2
+    // A backslash escapes the next char (incl. the delimiter: `s/a\/b/c/`).
     const field = (): string => {
-      const start = i
-      while (i < rest.length && rest[i] !== delim) i += 1
-      const value = rest.slice(start, i)
+      let value = ''
+      while (i < rest.length && rest[i] !== delim) {
+        const c = rest[i]
+        if (c === '\\' && i + 1 < rest.length) {
+          value += c + (rest[i + 1] ?? '')
+          i += 2
+          continue
+        }
+        value += c ?? ''
+        i += 1
+      }
       i += 1
       return value
     }
@@ -122,6 +131,10 @@ export function parseOneCommand(rest: string): [SedCommand, string] {
       if (fc === undefined || !/[0-9gpiImMe]/.test(fc)) break
       exprFlags += fc
       i += 1
+    }
+    const cm = /[0-9]+/.exec(exprFlags)
+    if (cm && Number.parseInt(cm[0], 10) === 0) {
+      throw new Error("sed: number option to `s' command may not be zero")
     }
     return [
       { cmd: 's', pattern, replacement, exprFlags, addrStart, addrEnd, negate },
@@ -321,12 +334,9 @@ function addrMatches(
   const [kind, val] = addr
   if (kind === 'line') return lineno === Number.parseInt(val, 10)
   if (kind === 'last') return lineno === total
-  // kind === 'regex'
-  // Match against the line content, excluding the preserved trailing newline,
-  // so anchored addresses like /^[0-9]*$/ behave per POSIX/GNU sed (and the
-  // Python implementation). See issue #326.
-  const subject = line.endsWith('\n') ? line.slice(0, -1) : line
-  return compilePattern(val, '', extended).test(subject)
+  // kind === 'regex' — the pattern space has no trailing newline, so anchors
+  // (^/$) match line content directly.
+  return compilePattern(val, '', extended).test(line)
 }
 
 export function translateReplacement(repl: string): string {
@@ -387,15 +397,8 @@ function regexReplace(
   count = 1,
   extended = false,
 ): string {
-  // POSIX sed line semantics: `^`/`$` anchor to the line content, not the
-  // line-separator newline that splitLinesKeepEnds preserves. JS `$` (without
-  // the `m` flag) only matches the absolute end of input, so an anchored
-  // substitution like `s/^#[0-9]*$/.../ ` is a no-op against "#123\n". Strip a
-  // single trailing newline before substituting and re-append it afterwards so
-  // the anchors see line content — matching the Python implementation and GNU
-  // sed (whose pattern space excludes the trailing newline). See issue #326.
-  const hasNewline = text.endsWith('\n')
-  const body = hasNewline ? text.slice(0, -1) : text
+  // The pattern space excludes the line-separator newline (GNU semantics), so
+  // `^`/`$` anchor to its content directly — no stripping needed here.
   // `count` is the 1-based occurrence the substitution starts at (GNU sed's
   // numeric `s///N` flag, default 1). Without `g` only that single occurrence
   // is replaced; with `g` that occurrence and every later one are. Iterate all
@@ -406,25 +409,21 @@ function regexReplace(
   const single = new RegExp(erePat, baseFlags)
   const jsRepl = translateReplacement(repl)
   let n = 0
-  const out = body.replace(scan, (m: string) => {
+  return text.replace(scan, (m: string) => {
     n += 1
     const hit = global ? n >= count : n === count
     return hit ? m.replace(single, jsRepl) : m
   })
-  return hasNewline ? out + '\n' : out
 }
 
-function splitLinesKeepEnds(text: string): string[] {
-  const lines: string[] = []
-  let start = 0
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === '\n') {
-      lines.push(text.slice(start, i + 1))
-      start = i + 1
-    }
-  }
-  if (start < text.length) lines.push(text.slice(start))
-  return lines
+// Split into line contents WITHOUT trailing newlines (the sed pattern space
+// excludes the separator). `finalNewline` records whether the input's last
+// line ended with a newline, so output can preserve a missing final newline.
+function splitContentLines(text: string): { lines: string[]; finalNewline: boolean } {
+  if (text === '') return { lines: [], finalNewline: false }
+  const finalNewline = text.endsWith('\n')
+  const body = finalNewline ? text.slice(0, -1) : text
+  return { lines: body.split('\n'), finalNewline }
 }
 
 export function executeProgram(
@@ -433,7 +432,7 @@ export function executeProgram(
   suppress = false,
   extended = false,
 ): string {
-  const lines = splitLinesKeepEnds(text)
+  const { lines, finalNewline } = splitContentLines(text)
   const total = lines.length
   let hold = ''
   const output: string[] = []
@@ -443,12 +442,15 @@ export function executeProgram(
     if (c?.cmd === ':' && c.label !== undefined) labelMap.set(c.label, idx)
   }
   const rangeActive = new Map<number, boolean>()
+  // Trailing newline for a pattern space whose last consumed line is `ln`
+  // (1-based): every line gets one except a last line that had none on input.
+  const tailNL = (ln: number): string => (ln < total || finalNewline ? '\n' : '')
 
   let i = 0
   while (i < total) {
     let pattern = lines[i] ?? ''
     i += 1
-    const lineno = i
+    let lineno = i
     const deferred: string[] = []
     let pc = 0
     let deleteFlag = false
@@ -526,7 +528,7 @@ export function executeProgram(
         if (changed) substituted = true
         pattern = newPattern
         // `s///p` prints the pattern space when a substitution was made.
-        if (changed && ef.includes('p')) output.push(pattern)
+        if (changed && ef.includes('p')) output.push(pattern + tailNL(lineno))
       } else if (c === 'd') {
         deleteFlag = true
         break
@@ -540,14 +542,15 @@ export function executeProgram(
         deleteFlag = true
         break
       } else if (c === 'p') {
-        output.push(pattern)
+        output.push(pattern + tailNL(lineno))
       } else if (c === 'P') {
         const nl = pattern.indexOf('\n')
-        output.push(nl >= 0 ? pattern.slice(0, nl + 1) : pattern)
+        output.push(nl >= 0 ? pattern.slice(0, nl + 1) : pattern + tailNL(lineno))
       } else if (c === 'N') {
         if (i < total) {
-          pattern += lines[i] ?? ''
+          pattern += '\n' + (lines[i] ?? '')
           i += 1
+          lineno = i
         } else {
           break
         }
@@ -571,18 +574,15 @@ export function executeProgram(
       } else if (c === 'i') {
         output.push((cmd.text ?? '') + '\n')
       } else if (c === 'y') {
-        // Transliterate each char of pattern[i] -> replacement[i]. Leave the
-        // line-separator newline untouched (POSIX pattern-space semantics).
+        // Transliterate each char of pattern[i] -> replacement[i].
         const from = cmd.pattern ?? ''
         const to = cmd.replacement ?? ''
-        const hasNewline = pattern.endsWith('\n')
-        const bodyY = hasNewline ? pattern.slice(0, -1) : pattern
         let outY = ''
-        for (const chr of bodyY) {
+        for (const chr of pattern) {
           const idx = from.indexOf(chr)
           outY += idx >= 0 ? (to[idx] ?? chr) : chr
         }
-        pattern = hasNewline ? outY + '\n' : outY
+        pattern = outY
       } else if (c === 'c') {
         // Change: delete the pattern space and emit the text. For a single
         // address (or none) emit on each match; for a range emit once, when
@@ -595,7 +595,7 @@ export function executeProgram(
         }
         break
       } else if (c === 'q') {
-        output.push(pattern)
+        output.push(pattern + tailNL(lineno))
         return output.join('')
       } else if (c === 'b') {
         const label = cmd.label ?? ''
@@ -622,7 +622,7 @@ export function executeProgram(
     }
 
     if (!deleteFlag) {
-      if (!suppress) output.push(pattern)
+      if (!suppress) output.push(pattern + tailNL(lineno))
       for (const d of deferred) output.push(d)
     }
   }
