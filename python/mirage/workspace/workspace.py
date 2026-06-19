@@ -153,13 +153,25 @@ class Workspace:
                         session_id=session_id)
 
         if fuse_mounts:
-            for prefix, target in fuse_mounts.items():
-                if not target:
-                    continue
-                manager = FuseManager()
-                point = target if isinstance(target, str) else None
-                manager.setup(self, root_prefix=prefix, mountpoint=point)
-                self._fuse_managers[prefix] = manager
+            try:
+                for prefix, target in fuse_mounts.items():
+                    if not target:
+                        continue
+                    manager = FuseManager()
+                    point = target if isinstance(target, str) else None
+                    manager.setup(self, root_prefix=prefix, mountpoint=point)
+                    self._fuse_managers[prefix] = manager
+            except Exception:
+                # __exit__ is never reached when __init__ raises. Unwind any
+                # earlier FUSE mounts from this constructor before re-raising.
+                for manager in self._fuse_managers.values():
+                    try:
+                        manager.close()
+                    except Exception:
+                        logger.exception(
+                            "Failed to close FUSE manager after setup failure")
+                self._fuse_managers.clear()
+                raise
 
     async def history(self) -> list[dict]:
         """Command events recorded by the hidden recorder.

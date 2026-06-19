@@ -19,11 +19,32 @@ import types
 
 import pytest
 
+import mirage.workspace.workspace as workspace_module
+from mirage.resource.ram import RAMResource
 from mirage.workspace.fuse import FuseManager
 
 
 def _fail_mount_startup(*_args, **_kwargs):
     raise RuntimeError("fuse failed")
+
+
+class _TrackingFuseManager:
+
+    created = []
+    setup_calls = 0
+
+    def __init__(self):
+        self.closed = False
+        self.mountpoint = "/tmp/fake-fuse"
+        self.created.append(self)
+
+    def setup(self, *_args, **_kwargs):
+        type(self).setup_calls += 1
+        if type(self).setup_calls == 2:
+            raise RuntimeError("fuse failed")
+
+    def close(self):
+        self.closed = True
 
 
 class TestFuseManager:
@@ -102,3 +123,36 @@ class TestFuseManager:
 
         assert not generated.exists()
         assert fm.mountpoint is None
+
+    def test_setup_keeps_caller_mountpoint_when_mount_startup_fails(
+            self, monkeypatch, tmp_path):
+        # Regression: caller-owned mountpoints must survive even when setup
+        # fails before FUSE is usable.
+        fake_mount = types.ModuleType("mirage.fuse.mount")
+        fake_mount.mount_background = _fail_mount_startup
+        monkeypatch.setitem(sys.modules, "mirage.fuse.mount", fake_mount)
+
+        fm = FuseManager()
+        with pytest.raises(RuntimeError, match="fuse failed"):
+            fm.setup(object(), mountpoint=str(tmp_path))
+
+        assert tmp_path.exists()
+        assert fm.mountpoint is None
+
+    def test_workspace_closes_prior_fuse_managers_when_later_setup_fails(
+            self, monkeypatch):
+        # Regression: Workspace.__init__ may raise now that setup failures are
+        # visible, so already-mounted prefixes need constructor-local cleanup.
+        _TrackingFuseManager.created = []
+        _TrackingFuseManager.setup_calls = 0
+        monkeypatch.setattr(workspace_module, "FuseManager",
+                            _TrackingFuseManager)
+
+        with pytest.raises(RuntimeError, match="fuse failed"):
+            workspace_module.Workspace({"/data": RAMResource()},
+                                       fuse_mounts={
+                                           "/one": True,
+                                           "/two": True,
+                                       })
+
+        assert _TrackingFuseManager.created[1].closed is True
