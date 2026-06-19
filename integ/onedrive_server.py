@@ -114,10 +114,19 @@ class FakeGraph:
             } for v in entry["versions"]],
         }
 
+    def _folder_size(self, path: str) -> int:
+        path = _norm(path)
+        prefix = path + "/" if path else ""
+        return sum(
+            len(entry["content"]) for f, entry in self.files.items()
+            if not path or f == path or f.startswith(prefix))
+
     def _folder_item(self, path: str) -> dict:
         return {
             "id": f"folder:{path}" if path else "root",
             "name": posixpath.basename(path) if path else "root",
+            "size": self._folder_size(path),
+            "lastModifiedDateTime": MODIFIED,
             "folder": {
                 "childCount": len(self._children(path))
             },

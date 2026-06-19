@@ -13,7 +13,7 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 from mirage.accessor.onedrive import OneDriveAccessor
-from mirage.cache.index import IndexCacheStore, IndexEntry
+from mirage.cache.index import IndexCacheStore, IndexEntry, ResourceType
 from mirage.core.onedrive._client import graph_list, item_url
 from mirage.types import PathSpec
 
@@ -49,14 +49,14 @@ async def readdir(accessor: OneDriveAccessor, path: PathSpec,
         if "folder" in child:
             entry = IndexEntry(id=key,
                                name=cname,
-                               resource_type="folder",
+                               resource_type=ResourceType.FOLDER,
                                size=child.get("size"),
                                remote_time=child.get("lastModifiedDateTime",
                                                      ""))
         else:
             entry = IndexEntry(id=key,
                                name=cname,
-                               resource_type="file",
+                               resource_type=ResourceType.FILE,
                                size=child.get("size"),
                                remote_time=child.get("lastModifiedDateTime",
                                                      ""))

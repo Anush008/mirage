@@ -13,7 +13,7 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 from mirage.accessor.onedrive import OneDriveAccessor
-from mirage.cache.index import IndexCacheStore
+from mirage.cache.index import IndexCacheStore, ResourceType
 from mirage.core.onedrive._client import (GraphError, graph_get, item_url,
                                           split_path)
 from mirage.types import FileStat, FileType, PathSpec
@@ -55,7 +55,7 @@ async def stat(accessor: OneDriveAccessor,
         lookup = await index.get(virtual_key)
         if lookup.entry is not None:
             entry = lookup.entry
-            if entry.resource_type == "folder":
+            if entry.resource_type == ResourceType.FOLDER:
                 return FileStat(name=entry.name,
                                 type=FileType.DIRECTORY,
                                 size=entry.size,
