@@ -52,9 +52,20 @@ class FuseManager:
         else:
             self._mountpoint = tempfile.mkdtemp(prefix="mirage-")
             self._owns_mountpoint = True
-        self._thread = mount_background(ws,
-                                        self._mountpoint,
-                                        root_prefix=root_prefix)
+        try:
+            self._thread = mount_background(ws,
+                                            self._mountpoint,
+                                            root_prefix=root_prefix)
+        except Exception:
+            if self._owns_mountpoint:
+                try:
+                    os.rmdir(self._mountpoint)
+                except OSError:
+                    pass
+            self._mountpoint = None
+            self._owns_mountpoint = False
+            self._auto = False
+            raise
         self._auto = True
 
     def unmount(self) -> None:

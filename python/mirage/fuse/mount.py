@@ -12,16 +12,20 @@
 # limitations under the License.
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import logging
 import os
 import subprocess
 import sys
 import threading
-import time
+from queue import Empty, SimpleQueue
 
 import mfusepy as fuse
 
 from mirage.fuse.fs import MirageFS
 from mirage.workspace import Workspace
+
+_STARTUP_TIMEOUT = 0.3
+logger = logging.getLogger(__name__)
 
 
 def _run_fuse(fs: MirageFS, mountpoint: str, foreground: bool) -> None:
@@ -32,16 +36,34 @@ def _run_fuse(fs: MirageFS, mountpoint: str, foreground: bool) -> None:
               direct_io=True)
 
 
-def mount_background(ws: Workspace,
-                     mountpoint: str,
-                     agent_id: str | None = None,
-                     root_prefix: str = "") -> threading.Thread:
+def _run_fuse_with_startup_report(fs: MirageFS, mountpoint: str,
+                                  foreground: bool,
+                                  errors: SimpleQueue[Exception]) -> None:
+    try:
+        _run_fuse(fs, mountpoint, foreground)
+    except Exception as exc:
+        errors.put(exc)
+        logger.exception("FUSE worker exited unexpectedly")
+
+
+def mount_background(
+        ws: Workspace,
+        mountpoint: str,
+        agent_id: str | None = None,
+        root_prefix: str = "",
+        startup_timeout: float = _STARTUP_TIMEOUT) -> threading.Thread:
     fs = MirageFS(ws, agent_id=agent_id, root_prefix=root_prefix)
-    t = threading.Thread(target=_run_fuse,
-                         args=(fs, mountpoint, True),
+    errors: SimpleQueue[Exception] = SimpleQueue()
+    t = threading.Thread(target=_run_fuse_with_startup_report,
+                         args=(fs, mountpoint, True, errors),
                          daemon=True)
     t.start()
-    time.sleep(0.3)
+    t.join(timeout=startup_timeout)
+    if not t.is_alive():
+        try:
+            raise errors.get_nowait()
+        except Empty as exc:
+            raise RuntimeError("FUSE worker exited during startup") from exc
     return t
 
 

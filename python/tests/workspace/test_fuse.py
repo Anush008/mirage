@@ -13,11 +13,17 @@
 # ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
 import subprocess
+import sys
 import tempfile
+import types
 
 import pytest
 
 from mirage.workspace.fuse import FuseManager
+
+
+def _fail_mount_startup(*_args, **_kwargs):
+    raise RuntimeError("fuse failed")
 
 
 class TestFuseManager:
@@ -73,6 +79,26 @@ class TestFuseManager:
         fm = FuseManager()
         fm.setup(object())
         fm.close()
+
+        assert not generated.exists()
+        assert fm.mountpoint is None
+
+    def test_setup_cleans_generated_mountpoint_when_mount_startup_fails(
+            self, monkeypatch, tmp_path):
+        # Regression: if FUSE never starts, Mirage still owns the generated
+        # temp mountpoint and should leave no stale manager state behind.
+        generated = tmp_path / "mirage-generated"
+        generated.mkdir()
+
+        fake_mount = types.ModuleType("mirage.fuse.mount")
+        fake_mount.mount_background = _fail_mount_startup
+        monkeypatch.setitem(sys.modules, "mirage.fuse.mount", fake_mount)
+        monkeypatch.setattr(tempfile, "mkdtemp",
+                            lambda *_args, **_kwargs: str(generated))
+
+        fm = FuseManager()
+        with pytest.raises(RuntimeError, match="fuse failed"):
+            fm.setup(object())
 
         assert not generated.exists()
         assert fm.mountpoint is None
