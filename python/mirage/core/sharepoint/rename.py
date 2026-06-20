@@ -22,10 +22,8 @@ async def rename(accessor: SharePointAccessor, src: PathSpec,
     dst_parent = posixpath.dirname("/" + dst_resolved.item_path).strip("/")
     name = posixpath.basename(dst_resolved.item_path)
     body: dict = {"name": name}
-    if (
-        dst_parent != src_parent
-        or src_resolved.drive_id != dst_resolved.drive_id
-    ):
+    if (dst_parent != src_parent
+            or src_resolved.drive_id != dst_resolved.drive_id):
         body["parentReference"] = {
             "path": drive_ref_path(dst_resolved.drive_id, dst_parent)
         }

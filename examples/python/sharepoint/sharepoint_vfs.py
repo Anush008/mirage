@@ -80,10 +80,8 @@ def write_report(site, drive, all_sections):
     all_results = [r for section in all_sections for r in section[1]]
     total = len(all_results)
     passed = sum(1 for *_, ok, _, _ in all_results if ok)
-    lines.append(
-        f"**Total: {passed} passed, {total - passed} failed,"
-        f" {total} total ({passed/total*100:.1f}%)**\n"
-    )
+    lines.append(f"**Total: {passed} passed, {total - passed} failed,"
+                 f" {total} total ({passed/total*100:.1f}%)**\n")
 
     for section_name, results in all_sections:
         lines.append(f"\n## {section_name}\n")
@@ -92,11 +90,9 @@ def write_report(site, drive, all_sections):
         for i, (name, cmd, ok, stdout, stderr) in enumerate(results, 1):
             status = "✅" if ok else "❌"
             detail = escape_md(stdout) if ok else escape_md(stderr or stdout)
-            lines.append(
-                f"| {i} | {escape_md(name)} "
-                f"| `{escape_md(cmd)}` "
-                f"| {status} | {detail} |"
-            )
+            lines.append(f"| {i} | {escape_md(name)} "
+                         f"| `{escape_md(cmd)}` "
+                         f"| {status} | {detail} |")
         sec_passed = sum(1 for *_, ok, _, _ in results if ok)
         lines.append(f"\n**{sec_passed}/{len(results)} passed**\n")
 
@@ -129,10 +125,8 @@ async def main():
         ("mkdir", f'mkdir "{d}"'),
         ("write f1",
          f'echo "hello world\nfoo bar\nhello again\napple\nbanana" > "{f1}"'),
-        ("write f2",
-         f'echo "line1\nline2\nline3\nline4\nline5'
-         f'\nline6\nline7\nline8\nline9\nline10" > "{f2}"'
-         ),
+        ("write f2", f'echo "line1\nline2\nline3\nline4\nline5'
+         f'\nline6\nline7\nline8\nline9\nline10" > "{f2}"'),
     ]
     setup_results = await run_section(ws, setup, "Setup")
 

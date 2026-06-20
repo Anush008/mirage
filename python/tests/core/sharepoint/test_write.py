@@ -66,10 +66,8 @@ async def test_write_large_file_uses_upload_session(monkeypatch):
         ranges.append(kwargs["headers"]["Content-Range"])
         return CallbackResult(status=201, payload={"id": "X"})
 
-    session_url = (
-        f"{_BASE}/drives/{_DRIVE_ID}"
-        "/root:/big.bin:/createUploadSession"
-    )
+    session_url = (f"{_BASE}/drives/{_DRIVE_ID}"
+                   "/root:/big.bin:/createUploadSession")
     upload_url = "https://upload.example/session1"
     with aioresponses() as m:
         m.post(session_url, payload={"uploadUrl": upload_url})
