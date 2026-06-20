@@ -478,6 +478,12 @@ CASES: list[tuple[str, str]] = [
     ("diff_same", "diff /data/a.txt /data/a.txt"),
     ("diff_differ", "diff /data/a.txt /data/b.txt"),
     ("diff_u", "diff -u /data/sorted_a.txt /data/sorted_b.txt"),
+    ("diff_recursive", "mkdir -p /data/dr/x /data/dr/y"
+     " && echo aaa | tee /data/dr/x/a.txt > /dev/null"
+     " && echo AAA | tee /data/dr/y/a.txt > /dev/null"
+     " && echo keep | tee /data/dr/x/c.txt > /dev/null"
+     " && echo keep | tee /data/dr/y/c.txt > /dev/null"
+     " && diff -r /data/dr/x /data/dr/y"),
     ("cmp_same", "cmp /data/a.txt /data/a.txt"),
     ("cmp_differ", "cmp /data/a.txt /data/b.txt"),
 
