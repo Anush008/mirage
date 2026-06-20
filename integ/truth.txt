@@ -1392,6 +1392,11 @@ baz,
 -cherry
 +date
 +elder
+=== diff_recursive ===
+1c1
+< aaa
+---
+> AAA
 === cmp_same ===
 
 === cmp_differ ===
@@ -1399,7 +1404,7 @@ baz,
 === du_file ===
 24	/data/a.txt
 === du_dir ===
-688	/data
+706	/data
 === du_h ===
 24B	/data/a.txt
 === tree ===
@@ -1765,8 +1770,8 @@ disptree/d
 disptree/d/y.txt
 disptree/x.txt
 === history_last_two ===
-469  (cd /data && ls -R disptree)
-470  (cd /data && find disptree)
+470  (cd /data && ls -R disptree)
+471  (cd /data && find disptree)
 === bash_history_tail ===
 (cd /data && ls -R disptree)
 (cd /data && find disptree)
