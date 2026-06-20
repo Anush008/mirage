@@ -887,6 +887,10 @@ async def run_cases(ws) -> None:
 async def assert_real_mtime(ws) -> None:
     await ws.execute("mkdir -p /data/mtimecheck")
     await ws.execute("tee /data/mtimecheck/probe.txt > /dev/null", stdin=b"x")
+    # Drop the write-through cache so the listing resolves mtime from the
+    # backend stat (the read-cache layer does not carry mtime; that is a
+    # separate concern from whether the backend reports it).
+    await ws.cache.clear()
     file_out = await (
         await ws.execute("ls -l /data/mtimecheck/probe.txt")).stdout_str()
     dir_out = await (await
