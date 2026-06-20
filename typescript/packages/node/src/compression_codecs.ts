@@ -12,9 +12,25 @@
 // limitations under the License.
 // ========= Copyright 2026 @ Strukto.AI All Rights Reserved. =========
 
+import { createRequire } from 'node:module'
 import { registerCompressionCodec } from '@struktoai/mirage-core'
-import { Bzip2 } from 'compressjs'
-import { xz } from '@napi-rs/lzma'
+
+interface Bzip2Module {
+  compressFile(input: Uint8Array): Uint8Array
+  decompressFile(input: Uint8Array): Uint8Array
+}
+
+interface XzModule {
+  compress(input: Uint8Array): Promise<Uint8Array>
+  decompress(input: Uint8Array): Promise<Uint8Array>
+}
+
+// compressjs and @napi-rs/lzma are CommonJS; load them via createRequire so
+// the built ESM output resolves their exports without named-import interop
+// pitfalls (mirrors the createRequire usage in workspace.ts).
+const requireCjs = createRequire(import.meta.url)
+const { Bzip2 } = requireCjs('compressjs') as { Bzip2: Bzip2Module }
+const { xz } = requireCjs('@napi-rs/lzma') as { xz: XzModule }
 
 registerCompressionCodec('bzip2', {
   compress: (bytes) => Promise.resolve(Uint8Array.from(Bzip2.compressFile(bytes))),
